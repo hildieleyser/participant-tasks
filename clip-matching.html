@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual-Semantic Matching Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #d4d4d8; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 1.5rem; color: #fafafa; margin-bottom: 8px; letter-spacing: -0.02em; }
+        .subtitle { font-size: 0.85rem; color: #71717a; margin-bottom: 20px; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 8px; font-family: inherit; padding: 12px 32px; font-size: 0.9rem; font-weight: 600; cursor: pointer; transition: background 0.15s; margin-top: 12px; }
+        .btn:hover { background: #e4e4e7; }
+
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
+
+        /* Game layout */
+        .game-container { display: flex; flex-direction: column; align-items: center; gap: 20px; }
+        .trial-info { color: #52525b; font-size: 0.8rem; }
+        .task-type-label { font-size: 0.75rem; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 4px; }
+
+        canvas { border: 1px solid #27272a; border-radius: 10px; background: #18181b; }
+
+        /* Caption choices */
+        .caption-choices { display: flex; flex-direction: column; gap: 8px; width: 100%; max-width: 520px; }
+        .caption-btn {
+            background: #18181b; border: 1px solid #27272a; border-radius: 8px;
+            padding: 12px 16px; text-align: left; color: #d4d4d8; font-family: inherit;
+            font-size: 0.85rem; cursor: pointer; transition: background 0.15s, border-color 0.15s;
+            line-height: 1.4;
+        }
+        .caption-btn:hover { background: #1f1f23; border-color: #3f3f46; }
+        .caption-btn.disabled { pointer-events: none; opacity: 0.4; }
+        .caption-btn.correct { background: #1a2e1a; border-color: #4ade80; color: #4ade80; }
+        .caption-btn.incorrect { background: #2e1a1a; border-color: #ef4444; color: #ef4444; }
+        .caption-btn .key-hint { display: inline-block; width: 22px; height: 22px; border-radius: 4px; background: #27272a; color: #71717a; text-align: center; line-height: 22px; font-size: 0.7rem; font-weight: 700; margin-right: 10px; vertical-align: middle; }
+
+        /* Image grid for image selection mode */
+        .image-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; }
+        .image-option {
+            border: 2px solid #27272a; border-radius: 10px; cursor: pointer;
+            transition: border-color 0.15s; overflow: hidden;
+        }
+        .image-option:hover { border-color: #3f3f46; }
+        .image-option.correct { border-color: #4ade80; }
+        .image-option.incorrect { border-color: #ef4444; }
+        .image-option.disabled { pointer-events: none; opacity: 0.4; }
+        .image-option canvas { border: none; border-radius: 8px; display: block; }
+
+        .prompt-text {
+            font-size: 1rem; color: #fafafa; font-weight: 600; text-align: center;
+            padding: 12px 20px; background: #18181b; border: 1px solid #27272a;
+            border-radius: 8px; max-width: 520px;
+        }
+
+        .feedback-line { font-size: 0.85rem; min-height: 20px; margin-top: 4px; }
+
+        .progress-bar { width: 100%; max-width: 520px; height: 3px; background: #27272a; border-radius: 2px; overflow: hidden; }
+        .progress-fill { height: 100%; background: #d4d4d8; transition: width 0.3s; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 400px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Visual-Semantic Matching</h1>
+    <p class="subtitle">Match images and descriptions as quickly and accurately as possible.</p>
+    <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text">View a scene or description</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Pick the best match from the options</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">Distractors are designed to be close</div></div>
+    </div>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="trial-info" id="trialInfo"></div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="game-container" id="gameContainer"></div>
+    <div class="feedback-line" id="feedbackLine"></div>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <div style="display:flex;gap:8px;">
+        <button class="btn" onclick="downloadData()">Download JSON</button>
+        <button class="btn" onclick="downloadCSV()" style="background:#27272a;color:#d4d4d8;border:1px solid #3f3f46;">Download CSV</button>
+    </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+// ── Scene vocabulary (CLIP-inspired categories) ──
+const COLORS = [
+    { name: 'red', hex: '#dc2626' }, { name: 'blue', hex: '#2563eb' },
+    { name: 'green', hex: '#16a34a' }, { name: 'yellow', hex: '#eab308' },
+    { name: 'purple', hex: '#9333ea' }, { name: 'orange', hex: '#ea580c' },
+    { name: 'pink', hex: '#ec4899' }, { name: 'white', hex: '#e5e5e5' },
+];
+
+const SHAPES = [
+    { name: 'circle', draw: (ctx, x, y, s) => { ctx.beginPath(); ctx.arc(x, y, s, 0, Math.PI * 2); ctx.fill(); } },
+    { name: 'square', draw: (ctx, x, y, s) => { ctx.fillRect(x - s, y - s, s * 2, s * 2); } },
+    { name: 'triangle', draw: (ctx, x, y, s) => { ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y + s); ctx.lineTo(x - s, y + s); ctx.closePath(); ctx.fill(); } },
+    { name: 'diamond', draw: (ctx, x, y, s) => { ctx.beginPath(); ctx.moveTo(x, y - s); ctx.lineTo(x + s, y); ctx.lineTo(x, y + s); ctx.lineTo(x - s, y); ctx.closePath(); ctx.fill(); } },
+    { name: 'star', draw: (ctx, x, y, s) => { ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = (i * 4 * Math.PI / 5) - Math.PI / 2; const b = a + 2 * Math.PI / 5; ctx.lineTo(x + Math.cos(a) * s, y + Math.sin(a) * s); ctx.lineTo(x + Math.cos(b) * s * 0.4, y + Math.sin(b) * s * 0.4); } ctx.closePath(); ctx.fill(); } },
+];
+
+const SIZES = [
+    { name: 'small', value: 18 }, { name: 'medium', value: 30 }, { name: 'large', value: 45 },
+];
+
+const POSITIONS = [
+    { name: 'top-left', x: 0.25, y: 0.25 }, { name: 'top-right', x: 0.75, y: 0.25 },
+    { name: 'center', x: 0.5, y: 0.5 },
+    { name: 'bottom-left', x: 0.25, y: 0.75 }, { name: 'bottom-right', x: 0.75, y: 0.75 },
+];
+
+const SPATIAL_RELATIONS = ['above', 'below', 'left of', 'right of', 'next to'];
+
+const BACKGROUNDS = [
+    { name: 'dark', color: '#18181b' }, { name: 'gray', color: '#27272a' },
+    { name: 'light', color: '#3f3f46' },
+];
+
+// ── Scene generation ──
+function pick(arr) { return arr[Math.floor(Math.random() * arr.length)]; }
+function pickN(arr, n) {
+    const copy = [...arr];
+    const result = [];
+    for (let i = 0; i < Math.min(n, copy.length); i++) {
+        const idx = Math.floor(Math.random() * copy.length);
+        result.push(copy.splice(idx, 1)[0]);
+    }
+    return result;
+}
+
+function generateScene(complexity) {
+    const numObjects = Math.min(2 + Math.floor(complexity / 2), 5);
+    const bg = pick(BACKGROUNDS);
+    const objects = [];
+
+    const usedPositions = [];
+    for (let i = 0; i < numObjects; i++) {
+        let pos;
+        do { pos = pick(POSITIONS); } while (usedPositions.includes(pos.name) && usedPositions.length < POSITIONS.length);
+        usedPositions.push(pos.name);
+
+        objects.push({
+            color: pick(COLORS),
+            shape: pick(SHAPES),
+            size: pick(SIZES),
+            position: pos,
+        });
+    }
+
+    return { background: bg, objects };
+}
+
+function describeScene(scene) {
+    const parts = [];
+    scene.objects.forEach((obj, i) => {
+        let desc = `a ${obj.size.name} ${obj.color.name} ${obj.shape.name}`;
+        if (scene.objects.length <= 3) {
+            desc += ` at the ${obj.position.name.replace('-', ' ')}`;
+        }
+        parts.push(desc);
+    });
+
+    if (parts.length === 1) return parts[0];
+    if (parts.length === 2) return `${parts[0]} and ${parts[1]}`;
+    return parts.slice(0, -1).join(', ') + ', and ' + parts[parts.length - 1];
+}
+
+function generateDistractorDescription(scene, type) {
+    const copy = JSON.parse(JSON.stringify(scene));
+
+    switch (type) {
+        case 'color_swap': {
+            const obj = copy.objects[Math.floor(Math.random() * copy.objects.length)];
+            let newColor;
+            do { newColor = pick(COLORS); } while (newColor.name === obj.color.name);
+            obj.color = newColor;
+            break;
+        }
+        case 'shape_swap': {
+            const obj = copy.objects[Math.floor(Math.random() * copy.objects.length)];
+            let newShape;
+            do { newShape = pick(SHAPES); } while (newShape.name === obj.shape.name);
+            obj.shape = newShape;
+            break;
+        }
+        case 'size_swap': {
+            const obj = copy.objects[Math.floor(Math.random() * copy.objects.length)];
+            let newSize;
+            do { newSize = pick(SIZES); } while (newSize.name === obj.size.name);
+            obj.size = newSize;
+            break;
+        }
+        case 'position_swap': {
+            const obj = copy.objects[Math.floor(Math.random() * copy.objects.length)];
+            let newPos;
+            do { newPos = pick(POSITIONS); } while (newPos.name === obj.position.name);
+            obj.position = newPos;
+            break;
+        }
+        case 'count_change': {
+            if (copy.objects.length > 1) {
+                copy.objects.pop();
+            } else {
+                copy.objects.push({
+                    color: pick(COLORS), shape: pick(SHAPES),
+                    size: pick(SIZES), position: pick(POSITIONS),
+                });
+            }
+            break;
+        }
+        case 'full_random': {
+            return describeScene(generateScene(copy.objects.length));
+        }
+    }
+    return describeScene(copy);
+}
+
+function drawScene(canvas, scene, width = 280, height = 220) {
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.fillStyle = scene.background.color;
+    ctx.fillRect(0, 0, width, height);
+
+    scene.objects.forEach(obj => {
+        ctx.fillStyle = obj.color.hex;
+        const x = obj.position.x * width;
+        const y = obj.position.y * height;
+        obj.shape.draw(ctx, x, y, obj.size.value);
+    });
+}
+
+// ── Trial generation ──
+const DISTRACTOR_TYPES = ['color_swap', 'shape_swap', 'size_swap', 'position_swap', 'count_change', 'full_random'];
+
+function generateImageToTextTrial(complexity) {
+    const scene = generateScene(complexity);
+    const correctCaption = describeScene(scene);
+
+    const distractorTypes = pickN(DISTRACTOR_TYPES, 3);
+    const distractors = distractorTypes.map(t => ({
+        text: generateDistractorDescription(scene, t),
+        type: t
+    }));
+
+    // Ensure no duplicates
+    const captions = [{ text: correctCaption, correct: true, type: 'correct' }];
+    distractors.forEach(d => {
+        if (d.text !== correctCaption) {
+            captions.push({ text: d.text, correct: false, type: d.type });
+        }
+    });
+    while (captions.length < 4) {
+        captions.push({ text: generateDistractorDescription(scene, 'full_random'), correct: false, type: 'full_random' });
+    }
+
+    // Shuffle
+    for (let i = captions.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [captions[i], captions[j]] = [captions[j], captions[i]];
+    }
+
+    return { mode: 'image-to-text', scene, captions: captions.slice(0, 4), complexity };
+}
+
+function generateTextToImageTrial(complexity) {
+    const targetScene = generateScene(complexity);
+    const correctCaption = describeScene(targetScene);
+    const scenes = [{ scene: targetScene, correct: true }];
+
+    for (let i = 0; i < 3; i++) {
+        let distractor;
+        // Generate scenes that are somewhat similar
+        if (Math.random() < 0.6) {
+            distractor = generateScene(complexity);
+            // Copy some properties from target
+            const copyIdx = Math.floor(Math.random() * targetScene.objects.length);
+            if (distractor.objects.length > 0) {
+                const dIdx = Math.floor(Math.random() * distractor.objects.length);
+                if (Math.random() < 0.5) distractor.objects[dIdx].color = targetScene.objects[copyIdx].color;
+                else distractor.objects[dIdx].shape = targetScene.objects[copyIdx].shape;
+            }
+        } else {
+            distractor = generateScene(complexity);
+        }
+        scenes.push({ scene: distractor, correct: false });
+    }
+
+    // Shuffle
+    for (let i = scenes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [scenes[i], scenes[j]] = [scenes[j], scenes[i]];
+    }
+
+    return { mode: 'text-to-image', caption: correctCaption, scenes, complexity };
+}
+
+function generateOddOneOutTrial(complexity) {
+    const baseScene = generateScene(complexity);
+    const baseCaption = describeScene(baseScene);
+    // 3 scenes that match caption + 1 odd
+    const scenes = [];
+    scenes.push({ scene: baseScene, isOdd: false });
+
+    // Generate 2 more similar scenes (same description essentially)
+    for (let i = 0; i < 2; i++) {
+        const similar = JSON.parse(JSON.stringify(baseScene));
+        // Slight positional jitter
+        similar.objects.forEach(obj => {
+            obj.position = { ...obj.position, x: obj.position.x + (Math.random() - 0.5) * 0.08, y: obj.position.y + (Math.random() - 0.5) * 0.08 };
+        });
+        scenes.push({ scene: similar, isOdd: false });
+    }
+
+    // Generate odd one out
+    const oddScene = JSON.parse(JSON.stringify(baseScene));
+    const changeObj = oddScene.objects[Math.floor(Math.random() * oddScene.objects.length)];
+    if (Math.random() < 0.5) {
+        let nc; do { nc = pick(COLORS); } while (nc.name === changeObj.color.name);
+        changeObj.color = nc;
+    } else {
+        let ns; do { ns = pick(SHAPES); } while (ns.name === changeObj.shape.name);
+        changeObj.shape = ns;
+    }
+    scenes.push({ scene: oddScene, isOdd: true });
+
+    // Shuffle
+    for (let i = scenes.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [scenes[i], scenes[j]] = [scenes[j], scenes[i]];
+    }
+
+    return { mode: 'odd-one-out', caption: baseCaption, scenes, complexity };
+}
+
+// ── Build all trials ──
+function buildTrials() {
+    const trials = [];
+    // Practice: 3 easy
+    trials.push({ ...generateImageToTextTrial(1), practice: true });
+    trials.push({ ...generateTextToImageTrial(1), practice: true });
+    trials.push({ ...generateOddOneOutTrial(1), practice: true });
+
+    // Main: ramp complexity
+    for (let c = 1; c <= 4; c++) {
+        for (let r = 0; r < 5; r++) {
+            const mode = r % 3;
+            if (mode === 0) trials.push({ ...generateImageToTextTrial(c), practice: false });
+            else if (mode === 1) trials.push({ ...generateTextToImageTrial(c), practice: false });
+            else trials.push({ ...generateOddOneOutTrial(c), practice: false });
+        }
+        // Extra image-to-text and text-to-image
+        trials.push({ ...generateImageToTextTrial(c), practice: false });
+        trials.push({ ...generateTextToImageTrial(c), practice: false });
+    }
+
+    // Shuffle main trials
+    const practice = trials.filter(t => t.practice);
+    const main = trials.filter(t => !t.practice);
+    for (let i = main.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [main[i], main[j]] = [main[j], main[i]];
+    }
+    return [...practice, ...main];
+}
+
+// ── Game state ──
+let trials = [];
+let currentTrial = 0;
+let trialData = [];
+let stimOnsetTime = 0;
+let responded = false;
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    trials = buildTrials();
+    showTrial();
+}
+
+function showTrial() {
+    if (currentTrial >= trials.length) return endTask();
+    const trial = trials[currentTrial];
+    responded = false;
+
+    const info = trial.practice
+        ? `Practice ${currentTrial + 1}/3`
+        : `Trial ${currentTrial - 2}/${trials.length - 3}`;
+    document.getElementById('trialInfo').textContent = info;
+    document.getElementById('progressFill').style.width = `${(currentTrial / trials.length) * 100}%`;
+    document.getElementById('feedbackLine').textContent = '';
+
+    const container = document.getElementById('gameContainer');
+    container.innerHTML = '';
+
+    if (trial.mode === 'image-to-text') renderImageToText(container, trial);
+    else if (trial.mode === 'text-to-image') renderTextToImage(container, trial);
+    else if (trial.mode === 'odd-one-out') renderOddOneOut(container, trial);
+
+    stimOnsetTime = performance.now();
+}
+
+function renderImageToText(container, trial) {
+    const label = document.createElement('div');
+    label.className = 'task-type-label';
+    label.textContent = 'Which description matches this scene?';
+    container.appendChild(label);
+
+    const canvas = document.createElement('canvas');
+    drawScene(canvas, trial.scene, 400, 280);
+    container.appendChild(canvas);
+
+    const choices = document.createElement('div');
+    choices.className = 'caption-choices';
+    const keys = ['1', '2', '3', '4'];
+    trial.captions.forEach((cap, i) => {
+        const btn = document.createElement('button');
+        btn.className = 'caption-btn';
+        btn.innerHTML = `<span class="key-hint">${keys[i]}</span>${cap.text}`;
+        btn.onclick = () => respondCaption(btn, cap, trial);
+        choices.appendChild(btn);
+    });
+    container.appendChild(choices);
+}
+
+function renderTextToImage(container, trial) {
+    const label = document.createElement('div');
+    label.className = 'task-type-label';
+    label.textContent = 'Which scene matches this description?';
+    container.appendChild(label);
+
+    const prompt = document.createElement('div');
+    prompt.className = 'prompt-text';
+    prompt.textContent = trial.caption;
+    container.appendChild(prompt);
+
+    const grid = document.createElement('div');
+    grid.className = 'image-grid';
+    trial.scenes.forEach((s, i) => {
+        const opt = document.createElement('div');
+        opt.className = 'image-option';
+        const canvas = document.createElement('canvas');
+        drawScene(canvas, s.scene, 240, 180);
+        opt.appendChild(canvas);
+        opt.onclick = () => respondImage(opt, s, trial);
+        grid.appendChild(opt);
+    });
+    container.appendChild(grid);
+}
+
+function renderOddOneOut(container, trial) {
+    const label = document.createElement('div');
+    label.className = 'task-type-label';
+    label.textContent = 'Find the odd one out';
+    container.appendChild(label);
+
+    const grid = document.createElement('div');
+    grid.className = 'image-grid';
+    trial.scenes.forEach((s, i) => {
+        const opt = document.createElement('div');
+        opt.className = 'image-option';
+        const canvas = document.createElement('canvas');
+        drawScene(canvas, s.scene, 240, 180);
+        opt.appendChild(canvas);
+        opt.onclick = () => respondOdd(opt, s, trial);
+        grid.appendChild(opt);
+    });
+    container.appendChild(grid);
+}
+
+function respondCaption(btn, caption, trial) {
+    if (responded) return;
+    responded = true;
+    const rt = performance.now() - stimOnsetTime;
+
+    document.querySelectorAll('.caption-btn').forEach(b => b.classList.add('disabled'));
+    btn.classList.remove('disabled');
+    btn.classList.add(caption.correct ? 'correct' : 'incorrect');
+
+    // Show correct if wrong
+    if (!caption.correct) {
+        document.querySelectorAll('.caption-btn').forEach((b, i) => {
+            if (trial.captions[i].correct) { b.classList.remove('disabled'); b.classList.add('correct'); }
+        });
+    }
+
+    recordTrial(trial, caption.correct, rt, caption.type, trial.mode);
+    if (trial.practice) showPracticeFeedback(caption.correct);
+    currentTrial++;
+    setTimeout(showTrial, trial.practice ? 1500 : 800);
+}
+
+function respondImage(opt, sceneData, trial) {
+    if (responded) return;
+    responded = true;
+    const rt = performance.now() - stimOnsetTime;
+
+    document.querySelectorAll('.image-option').forEach(o => o.classList.add('disabled'));
+    opt.classList.remove('disabled');
+    opt.classList.add(sceneData.correct ? 'correct' : 'incorrect');
+
+    if (!sceneData.correct) {
+        const allOpts = document.querySelectorAll('.image-option');
+        trial.scenes.forEach((s, i) => {
+            if (s.correct) { allOpts[i].classList.remove('disabled'); allOpts[i].classList.add('correct'); }
+        });
+    }
+
+    recordTrial(trial, sceneData.correct, rt, 'image_selection', trial.mode);
+    if (trial.practice) showPracticeFeedback(sceneData.correct);
+    currentTrial++;
+    setTimeout(showTrial, trial.practice ? 1500 : 800);
+}
+
+function respondOdd(opt, sceneData, trial) {
+    if (responded) return;
+    responded = true;
+    const rt = performance.now() - stimOnsetTime;
+
+    document.querySelectorAll('.image-option').forEach(o => o.classList.add('disabled'));
+    opt.classList.remove('disabled');
+    opt.classList.add(sceneData.isOdd ? 'correct' : 'incorrect');
+
+    if (!sceneData.isOdd) {
+        const allOpts = document.querySelectorAll('.image-option');
+        trial.scenes.forEach((s, i) => {
+            if (s.isOdd) { allOpts[i].classList.remove('disabled'); allOpts[i].classList.add('correct'); }
+        });
+    }
+
+    recordTrial(trial, sceneData.isOdd, rt, 'odd_one_out', trial.mode);
+    if (trial.practice) showPracticeFeedback(sceneData.isOdd);
+    currentTrial++;
+    setTimeout(showTrial, trial.practice ? 1500 : 800);
+}
+
+// Keyboard support for image-to-text
+document.addEventListener('keydown', (e) => {
+    if (responded) return;
+    const trial = trials[currentTrial];
+    if (!trial || trial.mode !== 'image-to-text') return;
+    const idx = ['1', '2', '3', '4'].indexOf(e.key);
+    if (idx >= 0) {
+        const btns = document.querySelectorAll('.caption-btn');
+        if (btns[idx]) btns[idx].click();
+    }
+});
+
+function showPracticeFeedback(correct) {
+    const fb = document.getElementById('feedbackLine');
+    fb.textContent = correct ? 'Correct' : 'Incorrect';
+    fb.style.color = correct ? '#4ade80' : '#ef4444';
+}
+
+function recordTrial(trial, correct, rt, responseType, mode) {
+    trialData.push({
+        trial: currentTrial + 1,
+        practice: !!trial.practice,
+        mode: mode,
+        complexity: trial.complexity,
+        correct: correct,
+        reactionTimeMs: Math.round(rt * 100) / 100,
+        responseType: responseType,
+        numObjects: trial.scene ? trial.scene.objects.length : (trial.scenes ? trial.scenes[0].scene.objects.length : 0),
+        timestamp: Date.now()
+    });
+}
+
+function endTask() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const main = trialData.filter(t => !t.practice);
+    const accuracy = main.filter(t => t.correct).length / main.length * 100;
+    const meanRT = main.reduce((s, t) => s + t.reactionTimeMs, 0) / main.length;
+
+    const byMode = {};
+    main.forEach(t => {
+        if (!byMode[t.mode]) byMode[t.mode] = [];
+        byMode[t.mode].push(t);
+    });
+
+    let html = `
+        <div class="stat-box"><div class="stat-label">Accuracy</div><div class="stat-value">${accuracy.toFixed(1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Mean RT</div><div class="stat-value">${(meanRT / 1000).toFixed(2)}s</div></div>
+    `;
+    for (const [mode, trials] of Object.entries(byMode)) {
+        const acc = trials.filter(t => t.correct).length / trials.length * 100;
+        const label = mode.replace(/-/g, ' ');
+        html += `<div class="stat-box"><div class="stat-label">${label}</div><div class="stat-value">${acc.toFixed(0)}%</div></div>`;
+    }
+    document.getElementById('statsGrid').innerHTML = html;
+    localStorage.setItem('completed_clip-matching.html', 'true');
+    saveTaskData({ task: 'clip-matching', participantId, trials: trialData });
+}
+
+function downloadData() {
+    const data = { participantId, task: 'clip-matching', completedAt: Date.now(), trials: trialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `clip_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['trial', 'practice', 'mode', 'complexity', 'numObjects', 'correct', 'reactionTimeMs', 'responseType'];
+    const rows = trialData.map(t => headers.map(h => t[h] ?? ''));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `clip_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+<script src="data-store.js"></script>
+</body>
+</html>

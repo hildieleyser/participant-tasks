@@ -322,6 +322,7 @@ function endTask() {
     }
     document.getElementById('statsGrid').innerHTML = html;
     localStorage.setItem('completed_sequence-prediction.html', 'true');
+    saveTaskData({ task: 'sequence-prediction', participantId, trials: trialData });
 }
 
 function downloadData() {
@@ -340,5 +341,6 @@ function downloadCSV() {
     a.download = `sequence_${participantId}_${Date.now()}.csv`; a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

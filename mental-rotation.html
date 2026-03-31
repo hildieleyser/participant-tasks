@@ -301,6 +301,7 @@ function endTask() {
         <div class="stat-box"><div class="stat-label">Total Trials</div><div class="stat-value">${main.length}</div></div>
     `;
     localStorage.setItem('completed_mental-rotation.html', 'true');
+    saveTaskData({ task: 'mental-rotation', participantId, trials: trialData });
 }
 
 function downloadData() {
@@ -319,5 +320,6 @@ function downloadCSV() {
     a.download = `rotation_${participantId}_${Date.now()}.csv`; a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

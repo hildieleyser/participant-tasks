@@ -383,6 +383,7 @@ function endTask() {
         <div class="stat-box"><div class="stat-label">Total Trials</div><div class="stat-value">${mainTrials.length}</div></div>
     `;
     localStorage.setItem('completed_rhythm-replication.html', 'true');
+    saveTaskData({ task: 'rhythm-replication', participantId, trials: trialData });
 }
 
 function downloadData() {
@@ -401,5 +402,6 @@ function downloadCSV() {
     a.download = `rhythm_${participantId}_${Date.now()}.csv`; a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

@@ -589,6 +589,7 @@ function endTask() {
   phase = 'end';
   showScreen('screen-end');
   buildSummary();
+  saveTaskData({ task: 'facial-emotion-morphing', participantId: 'unknown', trials: trialData });
 }
 
 function buildSummary() {
@@ -754,5 +755,6 @@ function init() {
 
 window.addEventListener('DOMContentLoaded', init);
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

@@ -578,6 +578,7 @@ function submitReport() {
     }, 2800);
   } else {
     allData.sessionEnd = new Date().toISOString();
+    saveTaskData({ task: 'cyberball', participantId, trials: allData });
     showScreen('end-screen');
   }
 }
@@ -853,5 +854,6 @@ function downloadCSV() {
   URL.revokeObjectURL(url);
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

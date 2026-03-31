@@ -375,6 +375,7 @@ function endTask() {
     }
     document.getElementById('statsGrid').innerHTML = html;
     localStorage.setItem('completed_n-back.html', 'true');
+    saveTaskData({ task: 'n-back', participantId, trials: allTrialData, blockSummaries: blockResults });
 }
 
 function downloadData() {
@@ -393,5 +394,6 @@ function downloadCSV() {
     a.download = `nback_${participantId}_${Date.now()}.csv`; a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

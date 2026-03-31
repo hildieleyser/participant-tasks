@@ -294,6 +294,7 @@ function endTask() {
         <div class="stat-box"><div class="stat-label">Conjunction Slope</div><div class="stat-value">${conjunctionSlope.toFixed(1)} ms/item</div></div>
     `;
     localStorage.setItem('completed_visual-search.html', 'true');
+    saveTaskData({ task: 'visual-search', participantId, trials: trialData });
 }
 
 function downloadData() {
@@ -312,5 +313,6 @@ function downloadCSV() {
     a.download = `visual-search_${participantId}_${Date.now()}.csv`; a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

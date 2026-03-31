@@ -300,6 +300,7 @@ function endTask() {
         <div class="stat-box"><div class="stat-label">Environments</div><div class="stat-value">${mainEnvs.length}</div></div>
     `;
     localStorage.setItem('completed_foraging-task.html', 'true');
+    saveTaskData({ task: 'foraging-task', participantId, trials: allData });
 }
 
 function downloadData() {
@@ -322,5 +323,6 @@ function downloadCSV() {
     a.download = `foraging_${participantId}_${Date.now()}.csv`; a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

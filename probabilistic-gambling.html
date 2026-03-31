@@ -358,6 +358,7 @@ function endGame() {
 
     // Mark as completed
     localStorage.setItem('completed_probabilistic-gambling.html', 'true');
+    saveTaskData({ task: 'probabilistic-gambling', participantId, trials: trialData, summary: getExportData() });
 }
 
 function getExportData() {
@@ -408,5 +409,6 @@ function downloadCSV() {
     a.click();
 }
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>

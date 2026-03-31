@@ -763,6 +763,7 @@ function showEndScreen(){
     <div class="end-stat"><div class="label">Avg. Sent</div><div class="value">${avgSent}</div></div>
     <div class="end-stat"><div class="label">Partners</div><div class="value">${NUM_PARTNERS}</div></div>
   `;
+  saveTaskData({ task: 'trust-game', participantId: sessionId, trials: STATE.trialData });
 }
 
 // ==================== DATA EXPORT ====================
@@ -856,5 +857,6 @@ document.addEventListener('keydown', function(e){
   }
 });
 </script>
+<script src="data-store.js"></script>
 </body>
 </html>
