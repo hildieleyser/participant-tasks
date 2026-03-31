@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Probabilistic Gambling Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            -webkit-font-smoothing: antialiased;
+            background: #111113;
+            color: #a1a1aa;
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            overflow: hidden;
+        }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+
+        /* Instructions */
+        .instructions { max-width: 600px; text-align: center; }
+        .instructions h1 {
+            font-size: 2rem;
+            color: #fafafa;
+            font-weight: 700;
+            margin-bottom: 20px;
+        }
+        .instructions p { color: #71717a; line-height: 1.7; margin-bottom: 16px; font-size: 1rem; }
+        .btn {
+            background: #fafafa;
+            color: #111113;
+            border: none;
+            border-radius: 8px;
+            padding: 14px 36px;
+            font-size: 1rem;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            transition: background 0.15s, transform 0.15s;
+            margin-top: 12px;
+        }
+        .btn:hover { background: #e4e4e7; transform: scale(1.02); }
+
+        /* Game UI */
+        .game-header {
+            display: flex; justify-content: space-between; align-items: center;
+            width: 100%; max-width: 900px; padding: 20px 0;
+        }
+        .bank {
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #fafafa;
+        }
+        .trial-counter { color: #52525b; font-size: 0.9rem; }
+
+        .decks {
+            display: flex; gap: 24px; justify-content: center; align-items: center;
+            flex-wrap: wrap; margin: 30px 0;
+        }
+        .deck {
+            width: 180px; height: 260px;
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 10px;
+            cursor: pointer;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            transition: transform 0.2s, background 0.2s, border-color 0.2s;
+            position: relative; overflow: hidden;
+        }
+        .deck:hover { transform: translateY(-6px); background: #1f1f23; border-color: #3f3f46; }
+        .deck.a { border-left: 3px solid #a1a1aa; }
+        .deck.b { border-left: 3px solid #71717a; }
+        .deck.c { border-left: 3px solid #52525b; }
+        .deck.d { border-left: 3px solid #3f3f46; }
+        .deck-label { font-size: 2.2rem; font-weight: 800; }
+        .deck.a .deck-label { color: #d4d4d8; }
+        .deck.b .deck-label { color: #a1a1aa; }
+        .deck.c .deck-label { color: #71717a; }
+        .deck.d .deck-label { color: #52525b; }
+        .deck-sub { font-size: 0.8rem; color: #52525b; margin-top: 8px; }
+        .deck.disabled { pointer-events: none; opacity: 0.5; }
+
+        /* Feedback overlay */
+        .feedback-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0;
+            display: none; align-items: center; justify-content: center;
+            background: rgba(0,0,0,0.6); z-index: 100;
+        }
+        .feedback-overlay.active { display: flex; }
+        .feedback-card {
+            background: #18181b; border-radius: 16px; padding: 40px 50px;
+            text-align: center; border: 1px solid #27272a;
+            animation: popIn 0.3s ease;
+        }
+        @keyframes popIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .reward-display { font-size: 2rem; font-weight: 700; color: #4ade80; margin-bottom: 8px; }
+        .loss-display { font-size: 1.8rem; font-weight: 700; color: #ef4444; margin-bottom: 8px; }
+        .net-display { font-size: 1.4rem; color: #71717a; margin-top: 12px; }
+        .net-display.positive { color: #4ade80; }
+        .net-display.negative { color: #ef4444; }
+
+        /* Progress bar */
+        .progress-bar {
+            width: 100%; max-width: 900px; height: 4px;
+            background: #27272a; border-radius: 2px; overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; background: #d4d4d8;
+            transition: width 0.3s ease; border-radius: 2px;
+        }
+
+        /* End screen */
+        .end-screen h1 {
+            font-size: 2rem;
+            color: #fafafa;
+            font-weight: 700;
+            margin-bottom: 12px;
+        }
+        .final-score { font-size: 3rem; font-weight: 800; color: #4ade80; margin: 20px 0; }
+        .final-score.loss { color: #ef4444; }
+        .stats-grid {
+            display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;
+            margin: 20px 0 30px; max-width: 400px;
+        }
+        .stat-box {
+            background: #18181b; border: 1px solid #27272a; border-radius: 12px;
+            padding: 16px; text-align: center;
+        }
+        .stat-label { font-size: 0.75rem; color: #52525b; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.4rem; font-weight: 700; color: #d4d4d8; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructionsScreen">
+    <div class="instructions">
+        <h1>Probabilistic Gambling Task</h1>
+        <p>You have been given a loan of <strong>$2,000</strong>.</p>
+        <p>In front of you are four decks of cards: <strong>A</strong>, <strong>B</strong>, <strong>C</strong>, and <strong>D</strong>. Each time you click a deck, you will receive some money. But sometimes you will also lose money.</p>
+        <p>Some decks are more profitable than others in the long run. Your goal is to <strong>maximize your total earnings</strong> over 100 card selections.</p>
+        <p>You won't know which decks are good or bad — you'll have to figure it out as you go.</p>
+        <button class="btn" onclick="startGame()">Begin Task</button>
+    </div>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="game-header">
+        <div class="bank" id="bankDisplay">$2,000</div>
+        <div class="trial-counter">Trial <span id="trialNum">1</span> / 100</div>
+    </div>
+    <div class="progress-bar"><div class="progress-fill" id="progressFill"></div></div>
+    <div class="decks">
+        <div class="deck a" onclick="selectDeck('A')"><div class="deck-label">A</div><div class="deck-sub">Click to draw</div></div>
+        <div class="deck b" onclick="selectDeck('B')"><div class="deck-label">B</div><div class="deck-sub">Click to draw</div></div>
+        <div class="deck c" onclick="selectDeck('C')"><div class="deck-label">C</div><div class="deck-sub">Click to draw</div></div>
+        <div class="deck d" onclick="selectDeck('D')"><div class="deck-label">D</div><div class="deck-sub">Click to draw</div></div>
+    </div>
+</div>
+
+<div class="feedback-overlay" id="feedbackOverlay">
+    <div class="feedback-card">
+        <div class="reward-display" id="rewardText"></div>
+        <div class="loss-display" id="lossText"></div>
+        <div class="net-display" id="netText"></div>
+    </div>
+</div>
+
+<div class="screen" id="endScreen">
+    <div class="end-screen" style="text-align:center;">
+        <h1>Task Complete</h1>
+        <div class="final-score" id="finalScore"></div>
+        <div class="stats-grid" id="statsGrid"></div>
+        <button class="btn" onclick="downloadData()" style="margin-right:10px;">Download JSON</button>
+        <button class="btn" onclick="downloadCSV()">Download CSV</button>
+    </div>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+let bank = 2000;
+let trial = 0;
+const totalTrials = 100;
+let trialData = [];
+let trialStartTime = 0;
+let isWaiting = false;
+
+// Deck schedules: pre-generate loss sequences for each deck
+// Deck A: +100 each, losses on specific cards (frequent moderate losses), net -250 per 10
+// Deck B: +100 each, one big loss per 10 cards, net -250 per 10
+// Deck C: +50 each, frequent small losses, net +250 per 10
+// Deck D: +50 each, one moderate loss per 10 cards, net +250 per 10
+
+function generateLossSchedule() {
+    const schedule = { A: [], B: [], C: [], D: [] };
+    for (let block = 0; block < 10; block++) {
+        // Deck A: 5 out of 10 cards have losses, total losses = 1250 per 10 (net -250 with +1000 gain)
+        const aLosses = [0, 0, 0, 0, 0, -150, -200, -250, -300, -350];
+        shuffleArray(aLosses);
+        schedule.A.push(...aLosses);
+
+        // Deck B: 1 out of 10 cards has a big loss of -1250
+        const bLosses = [0, 0, 0, 0, 0, 0, 0, 0, 0, -1250];
+        shuffleArray(bLosses);
+        schedule.B.push(...bLosses);
+
+        // Deck C: 5 out of 10 cards have small losses, total losses = 250 per 10 (net +250 with +500 gain)
+        const cLosses = [0, 0, 0, 0, 0, -25, -50, -50, -50, -75];
+        shuffleArray(cLosses);
+        schedule.C.push(...cLosses);
+
+        // Deck D: 1 out of 10 cards has a loss of -250
+        const dLosses = [0, 0, 0, 0, 0, 0, 0, 0, 0, -250];
+        shuffleArray(dLosses);
+        schedule.D.push(...dLosses);
+    }
+    return schedule;
+}
+
+function shuffleArray(arr) {
+    for (let i = arr.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [arr[i], arr[j]] = [arr[j], arr[i]];
+    }
+}
+
+const lossSchedule = generateLossSchedule();
+const deckDrawCount = { A: 0, B: 0, C: 0, D: 0 };
+const rewards = { A: 100, B: 100, C: 50, D: 50 };
+
+function startGame() {
+    document.getElementById('instructionsScreen').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    trialStartTime = performance.now();
+}
+
+function selectDeck(deck) {
+    if (isWaiting || trial >= totalTrials) return;
+    isWaiting = true;
+
+    const rt = performance.now() - trialStartTime;
+    const reward = rewards[deck];
+    const drawIndex = deckDrawCount[deck];
+    const loss = lossSchedule[deck][drawIndex] || 0;
+    deckDrawCount[deck]++;
+
+    const net = reward + loss;
+    bank += net;
+    trial++;
+
+    // Determine previous trial info for switching analysis
+    const prevDeck = trialData.length > 0 ? trialData[trialData.length - 1].deck : null;
+    const prevNet = trialData.length > 0 ? trialData[trialData.length - 1].netOutcome : null;
+
+    trialData.push({
+        trial: trial,
+        timestamp: Date.now(),
+        deck: deck,
+        reward: reward,
+        loss: loss,
+        netOutcome: net,
+        bankAfter: bank,
+        reactionTimeMs: Math.round(rt * 100) / 100,
+        switched: prevDeck !== null && prevDeck !== deck,
+        prevDeck: prevDeck,
+        prevOutcome: prevNet,
+        block: Math.ceil(trial / 20)
+    });
+
+    // Show feedback
+    const overlay = document.getElementById('feedbackOverlay');
+    document.getElementById('rewardText').textContent = `+$${reward}`;
+    if (loss < 0) {
+        document.getElementById('lossText').textContent = `-$${Math.abs(loss)}`;
+        document.getElementById('lossText').style.display = 'block';
+    } else {
+        document.getElementById('lossText').style.display = 'none';
+    }
+    const netEl = document.getElementById('netText');
+    netEl.textContent = `Net: ${net >= 0 ? '+' : ''}$${net}`;
+    netEl.className = 'net-display ' + (net >= 0 ? 'positive' : 'negative');
+    overlay.classList.add('active');
+
+    // Update UI
+    document.getElementById('bankDisplay').textContent = `$${bank.toLocaleString()}`;
+    document.getElementById('trialNum').textContent = trial;
+    document.getElementById('progressFill').style.width = `${(trial / totalTrials) * 100}%`;
+
+    setTimeout(() => {
+        overlay.classList.remove('active');
+        if (trial >= totalTrials) {
+            endGame();
+        } else {
+            trialStartTime = performance.now();
+            isWaiting = false;
+        }
+    }, 1200);
+}
+
+function endGame() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const finalEl = document.getElementById('finalScore');
+    const profit = bank - 2000;
+    finalEl.textContent = `$${bank.toLocaleString()} (${profit >= 0 ? '+' : ''}$${profit.toLocaleString()})`;
+    if (profit < 0) finalEl.classList.add('loss');
+
+    // Compute stats
+    const deckCounts = { A: 0, B: 0, C: 0, D: 0 };
+    let totalRT = 0;
+    let switches = 0;
+    let winStay = 0, winStayOpp = 0, loseShift = 0, loseShiftOpp = 0;
+
+    trialData.forEach((t, i) => {
+        deckCounts[t.deck]++;
+        totalRT += t.reactionTimeMs;
+        if (i > 0) {
+            if (t.switched) switches++;
+            if (t.prevOutcome >= 0) {
+                winStayOpp++;
+                if (!t.switched) winStay++;
+            } else {
+                loseShiftOpp++;
+                if (t.switched) loseShift++;
+            }
+        }
+    });
+
+    const advRatio = ((deckCounts.C + deckCounts.D) / totalTrials * 100).toFixed(1);
+    const meanRT = (totalRT / totalTrials / 1000).toFixed(2);
+    const wsRate = winStayOpp > 0 ? (winStay / winStayOpp * 100).toFixed(1) : 'N/A';
+    const lsRate = loseShiftOpp > 0 ? (loseShift / loseShiftOpp * 100).toFixed(1) : 'N/A';
+
+    const grid = document.getElementById('statsGrid');
+    grid.innerHTML = `
+        <div class="stat-box"><div class="stat-label">Advantageous %</div><div class="stat-value">${advRatio}%</div></div>
+        <div class="stat-box"><div class="stat-label">Mean RT</div><div class="stat-value">${meanRT}s</div></div>
+        <div class="stat-box"><div class="stat-label">Win-Stay</div><div class="stat-value">${wsRate}%</div></div>
+        <div class="stat-box"><div class="stat-label">Lose-Shift</div><div class="stat-value">${lsRate}%</div></div>
+        <div class="stat-box"><div class="stat-label">Deck A</div><div class="stat-value">${deckCounts.A}</div></div>
+        <div class="stat-box"><div class="stat-label">Deck B</div><div class="stat-value">${deckCounts.B}</div></div>
+        <div class="stat-box"><div class="stat-label">Deck C</div><div class="stat-value">${deckCounts.C}</div></div>
+        <div class="stat-box"><div class="stat-label">Deck D</div><div class="stat-value">${deckCounts.D}</div></div>
+    `;
+
+    // Mark as completed
+    localStorage.setItem('completed_probabilistic-gambling.html', 'true');
+}
+
+function getExportData() {
+    // Block summaries
+    const blocks = [1, 2, 3, 4, 5].map(b => {
+        const blockTrials = trialData.filter(t => t.block === b);
+        const counts = { A: 0, B: 0, C: 0, D: 0 };
+        blockTrials.forEach(t => counts[t.deck]++);
+        return { block: b, trials: `${(b-1)*20+1}-${b*20}`, deckCounts: counts, advRatio: (counts.C + counts.D) / 20 };
+    });
+
+    return {
+        participantId,
+        task: 'probabilistic-gambling',
+        startedAt: trialData[0]?.timestamp,
+        completedAt: trialData[trialData.length - 1]?.timestamp,
+        initialBank: 2000,
+        finalBank: bank,
+        totalTrials,
+        trials: trialData,
+        blockSummaries: blocks,
+        deckProfiles: {
+            A: { reward: 100, expectedNetPer10: -250, type: 'disadvantageous-frequent' },
+            B: { reward: 100, expectedNetPer10: -250, type: 'disadvantageous-infrequent' },
+            C: { reward: 50, expectedNetPer10: 250, type: 'advantageous-frequent' },
+            D: { reward: 50, expectedNetPer10: 250, type: 'advantageous-infrequent' }
+        }
+    };
+}
+
+function downloadData() {
+    const data = getExportData();
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `gambling_${participantId}_${Date.now()}.json`;
+    a.click();
+}
+
+function downloadCSV() {
+    const headers = ['trial','deck','reward','loss','netOutcome','bankAfter','reactionTimeMs','switched','prevDeck','prevOutcome','block'];
+    const rows = trialData.map(t => headers.map(h => t[h]));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `gambling_${participantId}_${Date.now()}.csv`;
+    a.click();
+}
+</script>
+</body>
+</html>

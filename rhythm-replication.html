@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rhythm Replication Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #e0e0f0; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 550px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 12px; padding: 14px 36px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s; margin-top: 12px; }
+        .btn:hover { background: #e4e4e7; }
+
+        .phase-label { font-size: 1.4rem; font-weight: 700; margin-bottom: 30px; min-height: 40px; }
+        .phase-listen { color: #60a5fa; }
+        .phase-go { color: #4ade80; }
+        .phase-wait { color: #71717a; }
+
+        .tap-area { position: relative; }
+        .tap-btn {
+            width: 180px; height: 180px; border-radius: 12px; border: 1px solid #3f3f46;
+            background: #18181b;
+            cursor: pointer; font-size: 1.2rem; color: #d4d4d8; font-weight: 700;
+            transition: transform 0.1s, background 0.1s; user-select: none;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .tap-btn:active, .tap-btn.pressed { transform: scale(0.93); background: #27272a; }
+        .tap-btn.disabled { opacity: 0.3; pointer-events: none; }
+        .tap-btn.stimulus-pulse { box-shadow: 0 1px 3px rgba(0,0,0,0.3); border-color: #60a5fa; }
+
+        .beat-dots { display: flex; gap: 10px; margin-top: 30px; min-height: 20px; }
+        .beat-dot { width: 14px; height: 14px; border-radius: 50%; background: #27272a; transition: background 0.2s; }
+        .beat-dot.played { background: #60a5fa; }
+        .beat-dot.tapped { background: #a1a1aa; }
+
+        .progress { color: #52525b; font-size: 0.85rem; position: absolute; top: 20px; right: 24px; }
+        .fixation { font-size: 3rem; color: #52525b; }
+
+        .feedback-text { font-size: 1.1rem; margin-top: 16px; min-height: 30px; }
+        .feedback-good { color: #4ade80; }
+        .feedback-ok { color: #fbbf24; }
+        .feedback-poor { color: #ef4444; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 360px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .stat-label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.3rem; font-weight: 700; color: #e0e0f0; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Rhythm Replication</h1>
+    <p>You will hear a rhythmic pattern. After it plays, replicate the pattern by tapping the button or pressing <strong>Spacebar</strong>.</p>
+    <p>Try to match the timing as precisely as possible. Patterns will get progressively harder.</p>
+    <p>First, you'll do 3 practice rounds with feedback, then the main task begins.</p>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="progress" id="progressText"></div>
+    <div class="phase-label" id="phaseLabel"></div>
+    <div class="tap-area">
+        <button class="tap-btn disabled" id="tapBtn" onmousedown="tap()" ontouchstart="tap()">TAP</button>
+    </div>
+    <div class="beat-dots" id="beatDots"></div>
+    <div class="feedback-text" id="feedbackText"></div>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="background:#27272a;border:1px solid #3f3f46;color:#d4d4d8;margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+let audioCtx;
+let allTrials = [];
+let trialData = [];
+let currentTrial = 0;
+let phase = 'idle'; // listen, wait, respond, feedback
+let targetIOIs = [];
+let responseTimestamps = [];
+let trialStartTime = 0;
+let goTime = 0;
+let isPractice = true;
+
+// Generate trial definitions
+function generateTrials() {
+    const trials = [];
+    // Difficulty 1-6, 3 trials each = 18 main + 3 practice
+    // Practice: difficulty 1-2
+    for (let p = 0; p < 3; p++) {
+        trials.push({ difficulty: p + 1, practice: true });
+    }
+    for (let d = 1; d <= 6; d++) {
+        for (let r = 0; r < 3; r++) {
+            trials.push({ difficulty: d, practice: false });
+        }
+    }
+    return trials;
+}
+
+function generatePattern(difficulty) {
+    const numBeats = Math.min(3 + difficulty, 8);
+    const baseIOI = 500 - difficulty * 20; // gets slightly faster
+    const iois = [];
+    for (let i = 0; i < numBeats - 1; i++) {
+        let ioi = baseIOI;
+        if (difficulty >= 2) {
+            // Add variation
+            const variation = [0.75, 1.0, 1.25, 1.5];
+            ioi = baseIOI * variation[Math.floor(Math.random() * Math.min(difficulty, variation.length))];
+        }
+        if (difficulty >= 4) {
+            // Add jitter
+            ioi += (Math.random() - 0.5) * 60;
+        }
+        iois.push(Math.round(Math.max(200, ioi)));
+    }
+    return { numBeats, iois };
+}
+
+function initAudio() {
+    if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+}
+
+function playClick(freq = 800, duration = 0.05, type = 'sine') {
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(freq * 0.6, audioCtx.currentTime + duration);
+    gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+    osc.connect(gain).connect(audioCtx.destination);
+    osc.start(); osc.stop(audioCtx.currentTime + duration);
+}
+
+function playTapSound() {
+    playClick(600, 0.04, 'triangle');
+    // Add noise burst
+    const bufferSize = audioCtx.sampleRate * 0.03;
+    const buffer = audioCtx.createBuffer(1, bufferSize, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = (Math.random() * 2 - 1) * 0.1 * (1 - i / bufferSize);
+    const src = audioCtx.createBufferSource();
+    src.buffer = buffer;
+    src.connect(audioCtx.destination);
+    src.start();
+}
+
+allTrials = generateTrials();
+
+function startTask() {
+    initAudio();
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    runTrial();
+}
+
+function runTrial() {
+    if (currentTrial >= allTrials.length) return endTask();
+    const trial = allTrials[currentTrial];
+    isPractice = trial.practice;
+    const pattern = generatePattern(trial.difficulty);
+    targetIOIs = pattern.iois;
+    responseTimestamps = [];
+
+    const label = isPractice ? `Practice ${currentTrial + 1}/3` : `Trial ${currentTrial - 2}/${allTrials.length - 3}`;
+    document.getElementById('progressText').textContent = label;
+    document.getElementById('feedbackText').textContent = '';
+
+    // Show fixation
+    const phaseEl = document.getElementById('phaseLabel');
+    phaseEl.textContent = '+';
+    phaseEl.className = 'phase-label phase-wait';
+    document.getElementById('tapBtn').classList.add('disabled');
+
+    // Setup beat dots
+    const dotsEl = document.getElementById('beatDots');
+    dotsEl.innerHTML = '';
+    for (let i = 0; i < pattern.numBeats; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'beat-dot';
+        dotsEl.appendChild(dot);
+    }
+
+    const fixDuration = 1000 + Math.random() * 500;
+    setTimeout(() => playStimulus(pattern), fixDuration);
+}
+
+function playStimulus(pattern) {
+    phase = 'listen';
+    const phaseEl = document.getElementById('phaseLabel');
+    phaseEl.textContent = '\u266A Listen';
+    phaseEl.className = 'phase-label phase-listen';
+    const tapBtn = document.getElementById('tapBtn');
+    const dots = document.getElementById('beatDots').children;
+
+    trialStartTime = performance.now();
+
+    let beatIndex = 0;
+    function playBeat() {
+        playClick(900, 0.06);
+        tapBtn.classList.add('stimulus-pulse');
+        if (dots[beatIndex]) dots[beatIndex].classList.add('played');
+        setTimeout(() => tapBtn.classList.remove('stimulus-pulse'), 100);
+        beatIndex++;
+        if (beatIndex < pattern.numBeats) {
+            setTimeout(playBeat, pattern.iois[beatIndex - 1]);
+        } else {
+            setTimeout(() => startResponse(), 800);
+        }
+    }
+    playBeat();
+}
+
+function startResponse() {
+    phase = 'respond';
+    const phaseEl = document.getElementById('phaseLabel');
+    phaseEl.textContent = 'Your Turn!';
+    phaseEl.className = 'phase-label phase-go';
+    document.getElementById('tapBtn').classList.remove('disabled');
+    goTime = performance.now();
+
+    // Reset dots
+    const dots = document.getElementById('beatDots').children;
+    for (let d of dots) { d.classList.remove('played'); d.classList.remove('tapped'); }
+
+    // Timeout after generous window
+    const maxWait = targetIOIs.reduce((a, b) => a + b, 0) * 3 + 5000;
+    setTimeout(() => {
+        if (phase === 'respond') finishResponse();
+    }, maxWait);
+}
+
+function tap() {
+    if (phase !== 'respond') return;
+    const now = performance.now();
+    responseTimestamps.push(now);
+    playTapSound();
+
+    // Visual feedback
+    const tapBtn = document.getElementById('tapBtn');
+    tapBtn.classList.add('pressed');
+    setTimeout(() => tapBtn.classList.remove('pressed'), 100);
+
+    // Beat dot
+    const dots = document.getElementById('beatDots').children;
+    const idx = responseTimestamps.length - 1;
+    if (dots[idx]) dots[idx].classList.add('tapped');
+
+    // Check if enough taps
+    if (responseTimestamps.length >= targetIOIs.length + 1) {
+        setTimeout(finishResponse, 200);
+    }
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && phase === 'respond') { e.preventDefault(); tap(); }
+});
+
+function finishResponse() {
+    if (phase !== 'respond') return;
+    phase = 'feedback';
+    document.getElementById('tapBtn').classList.add('disabled');
+
+    // Compute response IOIs
+    const responseIOIs = [];
+    for (let i = 1; i < responseTimestamps.length; i++) {
+        responseIOIs.push(responseTimestamps[i] - responseTimestamps[i - 1]);
+    }
+
+    // Compute correlation
+    const minLen = Math.min(targetIOIs.length, responseIOIs.length);
+    let correlation = 0;
+    if (minLen >= 2) {
+        const tSlice = targetIOIs.slice(0, minLen);
+        const rSlice = responseIOIs.slice(0, minLen);
+        correlation = pearsonCorrelation(tSlice, rSlice);
+    }
+
+    // Mean absolute error
+    let mae = 0;
+    for (let i = 0; i < minLen; i++) {
+        mae += Math.abs(targetIOIs[i] - responseIOIs[i]);
+    }
+    mae = minLen > 0 ? mae / minLen : 999;
+
+    const firstTapRT = responseTimestamps.length > 0 ? responseTimestamps[0] - goTime : null;
+
+    const trial = allTrials[currentTrial];
+    const record = {
+        trial: currentTrial + 1,
+        practice: trial.practice,
+        difficulty: trial.difficulty,
+        targetIOIs: targetIOIs.slice(),
+        responseIOIs: responseIOIs,
+        numTargetBeats: targetIOIs.length + 1,
+        numResponseBeats: responseTimestamps.length,
+        correlation: Math.round(correlation * 1000) / 1000,
+        meanAbsErrorMs: Math.round(mae),
+        firstTapRT: firstTapRT ? Math.round(firstTapRT * 100) / 100 : null,
+        trialStartTimestamp: trialStartTime,
+        goTimestamp: goTime,
+        tapTimestamps: responseTimestamps.slice(),
+        timestamp: Date.now()
+    };
+    trialData.push(record);
+
+    // Show feedback for practice
+    if (trial.practice) {
+        const fb = document.getElementById('feedbackText');
+        if (correlation > 0.85 && Math.abs(responseTimestamps.length - (targetIOIs.length + 1)) === 0) {
+            fb.textContent = 'Excellent!'; fb.className = 'feedback-text feedback-good';
+        } else if (correlation > 0.5) {
+            fb.textContent = `Good - try to match the timing more closely (r=${correlation.toFixed(2)})`;
+            fb.className = 'feedback-text feedback-ok';
+        } else {
+            fb.textContent = `Keep trying - listen carefully to the rhythm`;
+            fb.className = 'feedback-text feedback-poor';
+        }
+    }
+
+    currentTrial++;
+    setTimeout(runTrial, trial.practice ? 2000 : 1200);
+}
+
+function pearsonCorrelation(x, y) {
+    const n = x.length;
+    if (n < 2) return 0;
+    const mx = x.reduce((a, b) => a + b) / n;
+    const my = y.reduce((a, b) => a + b) / n;
+    let num = 0, dx = 0, dy = 0;
+    for (let i = 0; i < n; i++) {
+        const a = x[i] - mx, b = y[i] - my;
+        num += a * b; dx += a * a; dy += b * b;
+    }
+    return dx > 0 && dy > 0 ? num / Math.sqrt(dx * dy) : 0;
+}
+
+function endTask() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const mainTrials = trialData.filter(t => !t.practice);
+    const avgCorr = mainTrials.reduce((s, t) => s + t.correlation, 0) / mainTrials.length;
+    const avgMAE = mainTrials.reduce((s, t) => s + t.meanAbsErrorMs, 0) / mainTrials.length;
+    const avgRT = mainTrials.filter(t => t.firstTapRT).reduce((s, t) => s + t.firstTapRT, 0) / mainTrials.length;
+
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-box"><div class="stat-label">Mean Correlation</div><div class="stat-value">${avgCorr.toFixed(3)}</div></div>
+        <div class="stat-box"><div class="stat-label">Mean Abs Error</div><div class="stat-value">${Math.round(avgMAE)}ms</div></div>
+        <div class="stat-box"><div class="stat-label">Mean First-Tap RT</div><div class="stat-value">${Math.round(avgRT)}ms</div></div>
+        <div class="stat-box"><div class="stat-label">Total Trials</div><div class="stat-value">${mainTrials.length}</div></div>
+    `;
+    localStorage.setItem('completed_rhythm-replication.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'rhythm-replication', completedAt: Date.now(), trials: trialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `rhythm_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['trial','practice','difficulty','numTargetBeats','numResponseBeats','correlation','meanAbsErrorMs','firstTapRT'];
+    const rows = trialData.map(t => headers.map(h => t[h]));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `rhythm_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>

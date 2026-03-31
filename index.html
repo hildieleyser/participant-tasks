@@ -1,0 +1,515 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Neurobehavioral Task Battery</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+            background: #111113;
+            color: #d4d4d8;
+            min-height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        .container {
+            max-width: 960px;
+            margin: 0 auto;
+            padding: 48px 24px 80px;
+        }
+
+        header {
+            margin-bottom: 48px;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 600;
+            color: #fafafa;
+            margin-bottom: 6px;
+            letter-spacing: -0.02em;
+        }
+
+        .subtitle {
+            font-size: 0.875rem;
+            color: #71717a;
+            line-height: 1.5;
+        }
+
+        .participant-id-bar {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-top: 20px;
+        }
+
+        .participant-id-bar label {
+            font-size: 0.8rem;
+            color: #71717a;
+            font-weight: 500;
+        }
+
+        .participant-id-bar input {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 6px;
+            padding: 7px 12px;
+            color: #d4d4d8;
+            font-family: inherit;
+            font-size: 0.8rem;
+            width: 200px;
+            outline: none;
+            transition: border-color 0.15s;
+        }
+
+        .participant-id-bar input:focus {
+            border-color: #52525b;
+        }
+
+        .participant-id-bar button {
+            background: #27272a;
+            border: 1px solid #3f3f46;
+            border-radius: 6px;
+            padding: 7px 14px;
+            color: #a1a1aa;
+            font-family: inherit;
+            font-size: 0.8rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background 0.15s;
+        }
+
+        .participant-id-bar button:hover {
+            background: #3f3f46;
+        }
+
+        .domain-section {
+            margin-bottom: 32px;
+        }
+
+        .domain-label {
+            font-size: 0.7rem;
+            text-transform: uppercase;
+            letter-spacing: 0.08em;
+            color: #52525b;
+            font-weight: 600;
+            margin-bottom: 10px;
+            padding-left: 2px;
+        }
+
+        .task-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(290px, 1fr));
+            gap: 10px;
+        }
+
+        .task-card {
+            background: #18181b;
+            border: 1px solid #27272a;
+            border-radius: 8px;
+            padding: 16px 18px;
+            text-decoration: none;
+            color: inherit;
+            transition: background 0.15s, border-color 0.15s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .task-card:hover {
+            background: #1f1f23;
+            border-color: #3f3f46;
+        }
+
+        .task-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .task-indicator {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--dot);
+            flex-shrink: 0;
+        }
+
+        .task-name {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #e4e4e7;
+        }
+
+        .task-description {
+            font-size: 0.78rem;
+            color: #71717a;
+            line-height: 1.5;
+            padding-left: 18px;
+        }
+
+        .task-tags {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            padding-left: 18px;
+            margin-top: 2px;
+        }
+
+        .tag {
+            font-size: 0.65rem;
+            padding: 2px 7px;
+            border-radius: 3px;
+            background: #27272a;
+            color: #a1a1aa;
+        }
+
+        .task-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-top: auto;
+            padding-top: 4px;
+            padding-left: 18px;
+        }
+
+        .duration {
+            font-size: 0.7rem;
+            color: #52525b;
+        }
+
+        .launch-arrow {
+            font-size: 0.85rem;
+            color: #3f3f46;
+            transition: color 0.15s;
+        }
+
+        .task-card:hover .launch-arrow {
+            color: #71717a;
+        }
+
+        .status-badge {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            font-size: 0.6rem;
+            padding: 2px 6px;
+            border-radius: 3px;
+            background: #1a2e1a;
+            color: #4ade80;
+            font-weight: 500;
+        }
+
+        footer {
+            text-align: center;
+            margin-top: 48px;
+            color: #3f3f46;
+            font-size: 0.75rem;
+        }
+
+        @media (max-width: 600px) {
+            .task-grid { grid-template-columns: 1fr; }
+            .container { padding: 24px 16px 60px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Neurobehavioral Task Battery</h1>
+            <p class="subtitle">Interactive tasks for neuroscience data collection. Each task captures behavioral signals with millisecond-precision timing.</p>
+            <div class="participant-id-bar">
+                <label for="pid">Participant ID</label>
+                <input type="text" id="pid" placeholder="Enter or generate" />
+                <button onclick="generatePID()">Generate</button>
+            </div>
+        </header>
+
+        <div class="domain-section">
+            <div class="domain-label">Motor &amp; Timing</div>
+            <div class="task-grid">
+                <a class="task-card" href="rhythm-replication.html" style="--dot: #e879a0;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Rhythm Replication</div>
+                    </div>
+                    <div class="task-description">Listen to rhythmic patterns and tap them back. Measures temporal precision, error correction, and motor learning.</div>
+                    <div class="task-tags">
+                        <span class="tag">temporal processing</span>
+                        <span class="tag">motor timing</span>
+                        <span class="tag">auditory-motor coupling</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~8 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="pursuit-tracking.html" style="--dot: #d4956a;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Pursuit Tracking</div>
+                    </div>
+                    <div class="task-description">Track a moving target with your cursor across various trajectories. Measures motor control, prediction, and adaptation.</div>
+                    <div class="task-tags">
+                        <span class="tag">visuomotor control</span>
+                        <span class="tag">prediction</span>
+                        <span class="tag">adaptation</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~6 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="music-studio.html" style="--dot: #a68bc7;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Music Studio</div>
+                    </div>
+                    <div class="task-description">Free-form music creation with piano, orchestra, DJ pads, and sequencer. Captures creativity, motor sequencing, and auditory exploration.</div>
+                    <div class="task-tags">
+                        <span class="tag">creativity</span>
+                        <span class="tag">motor sequencing</span>
+                        <span class="tag">exploration</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~10 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="domain-section">
+            <div class="domain-label">Decision-Making &amp; Risk</div>
+            <div class="task-grid">
+                <a class="task-card" href="foraging-task.html" style="--dot: #6bbd7b;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Foraging Task</div>
+                    </div>
+                    <div class="task-description">Harvest depleting resource patches and decide when to move on. Measures explore/exploit tradeoffs and reward sensitivity.</div>
+                    <div class="task-tags">
+                        <span class="tag">explore-exploit</span>
+                        <span class="tag">reward sensitivity</span>
+                        <span class="tag">optimal stopping</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~12 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="probabilistic-gambling.html" style="--dot: #c7b46a;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Probabilistic Gambling</div>
+                    </div>
+                    <div class="task-description">Iowa Gambling Task variant. Learn which decks are profitable through trial and error. Measures affective decision-making and loss aversion.</div>
+                    <div class="task-tags">
+                        <span class="tag">risk assessment</span>
+                        <span class="tag">learning from feedback</span>
+                        <span class="tag">loss aversion</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~8 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="domain-section">
+            <div class="domain-label">Attention &amp; Working Memory</div>
+            <div class="task-grid">
+                <a class="task-card" href="n-back.html" style="--dot: #6a9fd4;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">N-Back</div>
+                    </div>
+                    <div class="task-description">Identify when the current stimulus matches the one N steps back, with visual distractors. Measures working memory capacity and interference control.</div>
+                    <div class="task-tags">
+                        <span class="tag">working memory</span>
+                        <span class="tag">interference control</span>
+                        <span class="tag">d-prime</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~10 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="visual-search.html" style="--dot: #5eb8c7;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Visual Search</div>
+                    </div>
+                    <div class="task-description">Find targets among distractors at varying set sizes. Measures attentional efficiency, feature vs. conjunction search, and search slopes.</div>
+                    <div class="task-tags">
+                        <span class="tag">selective attention</span>
+                        <span class="tag">feature binding</span>
+                        <span class="tag">search efficiency</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~10 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="domain-section">
+            <div class="domain-label">Spatial &amp; Pattern Reasoning</div>
+            <div class="task-grid">
+                <a class="task-card" href="mental-rotation.html" style="--dot: #c076c7;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Mental Rotation</div>
+                    </div>
+                    <div class="task-description">Judge whether two rotated shapes are the same or mirrored. Measures spatial processing speed and rotation rate.</div>
+                    <div class="task-tags">
+                        <span class="tag">spatial processing</span>
+                        <span class="tag">mental imagery</span>
+                        <span class="tag">Shepard &amp; Metzler</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~8 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="sequence-prediction.html" style="--dot: #8b7ec7;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Sequence Prediction</div>
+                    </div>
+                    <div class="task-description">Discover hidden rules in evolving sequences and predict the next element. Measures abstraction, hypothesis testing, and learning rate.</div>
+                    <div class="task-tags">
+                        <span class="tag">pattern recognition</span>
+                        <span class="tag">abstraction</span>
+                        <span class="tag">rule learning</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~10 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <div class="domain-section">
+            <div class="domain-label">Social &amp; Emotional</div>
+            <div class="task-grid">
+                <a class="task-card" href="facial-emotion-morphing.html" style="--dot: #c78ba0;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Facial Emotion Morphing</div>
+                    </div>
+                    <div class="task-description">Identify emotions in faces that gradually morph between expressions. Measures perceptual thresholds, categorical boundaries, and emotion biases.</div>
+                    <div class="task-tags">
+                        <span class="tag">emotion perception</span>
+                        <span class="tag">categorical boundaries</span>
+                        <span class="tag">perceptual thresholds</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~7 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="trust-game.html" style="--dot: #5eb89b;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Trust Game</div>
+                    </div>
+                    <div class="task-description">Iterated investment game with simulated partners of varying trustworthiness. Measures social reciprocity, trust dynamics, and betrayal response.</div>
+                    <div class="task-tags">
+                        <span class="tag">social cognition</span>
+                        <span class="tag">reciprocity</span>
+                        <span class="tag">theory of mind</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~12 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+
+                <a class="task-card" href="cyberball.html" style="--dot: #c76a6a;">
+                    <div class="task-header">
+                        <div class="task-indicator"></div>
+                        <div class="task-name">Cyberball</div>
+                    </div>
+                    <div class="task-description">Ball-tossing game with simulated players across inclusion, exclusion, and over-inclusion conditions. Measures social pain, belonging needs, and behavioral adaptation.</div>
+                    <div class="task-tags">
+                        <span class="tag">social exclusion</span>
+                        <span class="tag">need threat</span>
+                        <span class="tag">belonging</span>
+                    </div>
+                    <div class="task-meta">
+                        <span class="duration">~10 min</span>
+                        <span class="launch-arrow">&rarr;</span>
+                    </div>
+                </a>
+            </div>
+        </div>
+
+        <footer>
+            Neurobehavioral Task Battery &middot; Data collected locally, exported as JSON/CSV
+        </footer>
+    </div>
+
+    <script>
+        function generatePID() {
+            const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+            let id = 'P-';
+            for (let i = 0; i < 8; i++) {
+                id += chars[Math.floor(Math.random() * chars.length)];
+                if (i === 3) id += '-';
+            }
+            document.getElementById('pid').value = id;
+            localStorage.setItem('participantId', id);
+        }
+
+        const pidInput = document.getElementById('pid');
+        const stored = localStorage.getItem('participantId');
+        if (stored) pidInput.value = stored;
+
+        pidInput.addEventListener('input', () => {
+            localStorage.setItem('participantId', pidInput.value);
+        });
+
+        document.querySelectorAll('.task-card').forEach(card => {
+            card.addEventListener('click', (e) => {
+                const pid = pidInput.value.trim();
+                if (pid) {
+                    e.preventDefault();
+                    const url = new URL(card.href);
+                    url.searchParams.set('pid', pid);
+                    window.location.href = url.toString();
+                }
+            });
+        });
+
+        function updateCompletionStatus() {
+            document.querySelectorAll('.task-card').forEach(card => {
+                const taskFile = card.getAttribute('href');
+                const key = `completed_${taskFile}`;
+                if (localStorage.getItem(key)) {
+                    const badge = document.createElement('div');
+                    badge.className = 'status-badge';
+                    badge.textContent = 'Completed';
+                    card.appendChild(badge);
+                }
+            });
+        }
+        updateCompletionStatus();
+    </script>
+</body>
+</html>

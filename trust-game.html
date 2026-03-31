@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Iterated Trust Game - Behavioral Task</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#111113;--bg2:#18181b;--bg3:#27272a;
+  --border:#27272a;--border-light:#3f3f46;
+  --text:#d4d4d8;--text-dim:#a1a1aa;--text-muted:#71717a;--text-faint:#52525b;--text-bright:#fafafa;
+  --danger:#ef4444;--success:#4ade80;
+  --accent:#d4d4d8;--accent-muted:#71717a;
+}
+html,body{height:100%;overflow:hidden}
+body{
+  font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  background:var(--bg);color:var(--text);
+  display:flex;justify-content:center;align-items:center;
+}
+#app{
+  width:100vw;height:100vh;position:relative;overflow:hidden;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+}
+
+/* Screens */
+.screen{display:none;flex-direction:column;align-items:center;justify-content:center;width:100%;height:100%;position:absolute;top:0;left:0;padding:24px}
+.screen.active{display:flex}
+
+/* Instructions */
+.instructions-box{
+  max-width:680px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;padding:40px;text-align:left;line-height:1.7;
+}
+.instructions-box h1{
+  text-align:center;font-size:28px;color:var(--text-bright);margin-bottom:20px;
+  font-weight:700;
+}
+.instructions-box h2{font-size:18px;color:var(--text-bright);margin:16px 0 8px;font-weight:600}
+.instructions-box p,.instructions-box li{font-size:15px;color:var(--text)}
+.instructions-box ul{padding-left:24px;margin-bottom:12px}
+.instructions-box li{margin-bottom:4px}
+.highlight{color:var(--text-bright);font-weight:600}
+
+/* Buttons */
+.btn{
+  padding:14px 36px;border:none;border-radius:8px;
+  background:var(--text-bright);color:var(--bg);font-size:16px;font-weight:600;
+  cursor:pointer;transition:all .25s;margin-top:20px;letter-spacing:.5px;
+  font-family:inherit;
+}
+.btn:hover{opacity:.9;transform:translateY(-1px)}
+.btn:active{transform:translateY(0)}
+.btn-magenta{background:var(--bg3);color:var(--text);border:1px solid var(--border-light)}
+.btn-magenta:hover{opacity:.85}
+.btn-green{background:var(--text-bright);color:var(--bg);border:none}
+.btn-green:hover{opacity:.9}
+
+/* Game Screen */
+#game-screen{padding:0}
+.game-hud{
+  width:100%;display:flex;justify-content:space-between;align-items:center;
+  padding:16px 32px;background:var(--bg2);border-bottom:1px solid var(--border);
+  position:relative;z-index:5;
+}
+.hud-left,.hud-right{display:flex;align-items:center;gap:16px}
+.hud-label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+.hud-value{font-size:22px;font-weight:700;color:var(--text-bright)}
+.hud-value.tokens{color:var(--text-bright)}
+.hud-partner-info{text-align:center}
+.hud-partner-name{font-size:14px;color:var(--text-dim);font-weight:600}
+.hud-round{font-size:13px;color:var(--text-muted);margin-top:2px}
+
+.game-arena{
+  flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  position:relative;width:100%;
+}
+
+/* Avatars */
+.avatar-area{
+  display:flex;align-items:center;justify-content:space-between;
+  width:600px;max-width:90vw;margin-bottom:30px;position:relative;
+}
+.avatar-container{display:flex;flex-direction:column;align-items:center;gap:8px}
+.avatar-label{font-size:13px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+.avatar-svg{width:90px;height:90px;border-radius:50%;border:2px solid var(--border-light);overflow:hidden;background:var(--bg3)}
+.avatar-svg.partner-avatar{border-color:var(--text-faint)}
+.avatar-tokens{font-size:14px;font-weight:600;color:var(--text-dim)}
+
+/* Token transfer line */
+.transfer-line{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:300px;height:40px;display:flex;align-items:center;justify-content:center;
+}
+.token-anim{
+  position:absolute;width:20px;height:20px;border-radius:50%;
+  background:var(--accent-muted);
+  opacity:0;
+}
+
+/* Slider */
+.investment-panel{
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  padding:28px 40px;text-align:center;width:500px;max-width:90vw;
+}
+.investment-panel h3{font-size:16px;color:var(--text);margin-bottom:16px;font-weight:400}
+.slider-row{display:flex;align-items:center;gap:16px;margin-bottom:16px}
+.slider-row input[type=range]{
+  flex:1;-webkit-appearance:none;appearance:none;height:8px;
+  background:var(--bg3);
+  border-radius:4px;outline:none;cursor:pointer;
+}
+.slider-row input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;appearance:none;width:24px;height:24px;
+  background:var(--accent);border-radius:50%;cursor:pointer;
+}
+.slider-value{
+  font-size:32px;font-weight:700;color:var(--text-bright);min-width:50px;text-align:center;
+}
+.send-btn{
+  padding:12px 48px;border:none;border-radius:8px;
+  background:var(--text-bright);color:var(--bg);font-size:16px;font-weight:700;
+  cursor:pointer;transition:all .25s;letter-spacing:1px;font-family:inherit;
+}
+.send-btn:hover{opacity:.9}
+.send-btn:disabled{opacity:.3;cursor:default}
+
+/* Outcome */
+.outcome-panel{
+  background:var(--bg2);border:1px solid var(--border);border-radius:16px;
+  padding:28px 40px;text-align:center;width:500px;max-width:90vw;
+  display:none;
+}
+.outcome-panel h3{font-size:16px;color:var(--text-muted);margin-bottom:12px}
+.outcome-details{display:flex;justify-content:center;gap:32px;margin:16px 0}
+.outcome-item{text-align:center}
+.outcome-item .label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+.outcome-item .value{font-size:24px;font-weight:700;margin-top:4px}
+.outcome-item .value.sent{color:var(--danger)}
+.outcome-item .value.received-back{color:var(--success)}
+.outcome-item .value.net-pos{color:var(--success)}
+.outcome-item .value.net-neg{color:var(--danger)}
+.outcome-item .value.net-zero{color:var(--text-dim)}
+.continue-btn{
+  margin-top:12px;padding:10px 32px;border:1px solid var(--border-light);border-radius:8px;
+  background:var(--bg3);color:var(--text);font-size:14px;cursor:pointer;transition:all .25s;
+  font-family:inherit;
+}
+.continue-btn:hover{opacity:.85}
+
+/* Practice badge */
+.practice-badge{
+  position:absolute;top:80px;left:50%;transform:translateX(-50%);
+  background:var(--bg3);border:1px solid var(--border-light);
+  color:var(--text-dim);padding:6px 20px;border-radius:20px;
+  font-size:13px;font-weight:600;letter-spacing:1px;z-index:10;
+}
+
+/* Transition screen */
+#transition-screen{background:var(--bg)}
+.transition-content{text-align:center}
+.transition-content h2{font-size:24px;color:var(--text-bright);margin-bottom:12px;font-weight:600}
+.transition-content p{color:var(--text-muted);font-size:15px;margin-bottom:8px}
+.new-avatar-preview{margin:20px auto}
+
+/* History bar */
+.history-bar{
+  display:flex;gap:4px;justify-content:center;margin-top:12px;
+}
+.history-pip{
+  width:24px;height:8px;border-radius:3px;background:var(--bg3);transition:background .3s;
+}
+.history-pip.done{background:var(--text-muted)}
+.history-pip.current{background:var(--text-dim)}
+
+/* End screen */
+.end-box{
+  max-width:580px;background:var(--bg2);border:1px solid var(--border);
+  border-radius:16px;padding:40px;text-align:center;
+}
+.end-box h1{color:var(--text-bright);font-size:26px;margin-bottom:16px;font-weight:700}
+.end-stats{display:flex;gap:24px;justify-content:center;margin:20px 0;flex-wrap:wrap}
+.end-stat{text-align:center;min-width:100px}
+.end-stat .label{font-size:12px;color:var(--text-muted);text-transform:uppercase;letter-spacing:1px}
+.end-stat .value{font-size:28px;font-weight:700;color:var(--text-bright);margin-top:4px}
+.btn-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap}
+
+/* Scrollable instructions */
+.instructions-box{max-height:85vh;overflow-y:auto}
+.instructions-box::-webkit-scrollbar{width:6px}
+.instructions-box::-webkit-scrollbar-track{background:var(--bg3);border-radius:3px}
+.instructions-box::-webkit-scrollbar-thumb{background:var(--text-faint);border-radius:3px}
+
+/* Animations */
+@keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+.fade-in{animation:fadeIn .4s ease}
+</style>
+</head>
+<body>
+<div id="app">
+
+  <!-- INSTRUCTIONS SCREEN -->
+  <div class="screen active" id="instructions-screen">
+    <div class="instructions-box fade-in">
+      <h1>The Trust Game</h1>
+      <p>Welcome to this behavioral research task. You will interact with several different partners in a series of investment decisions.</p>
+
+      <h2>How It Works</h2>
+      <ul>
+        <li>Each round, you start with <span class="highlight">10 tokens</span>.</li>
+        <li>You choose how many tokens (0 to 10) to <span class="highlight">send to your partner</span>.</li>
+        <li>The amount you send is <span class="highlight">tripled</span> -- your partner receives 3x what you sent.</li>
+        <li>Your partner then decides how much of their received amount to <span class="highlight">return to you</span>.</li>
+        <li>Your earnings for the round = tokens you kept + tokens returned by partner.</li>
+      </ul>
+
+      <h2>Example</h2>
+      <p>You send <span class="highlight">6 tokens</span>. You keep 4. Your partner receives 18 (6 x 3). If your partner returns 9 tokens to you, your total for the round is 4 + 9 = <span class="highlight">13 tokens</span>.</p>
+
+      <h2>Structure</h2>
+      <ul>
+        <li>First, you will do a short <span class="highlight">practice round</span> (3 rounds with 1 partner) to get comfortable.</li>
+        <li>Then you will play <span class="highlight">10 rounds</span> with each of <span class="highlight">5 different partners</span>.</li>
+        <li>Each partner has their own personality and strategy. You will not know what it is in advance.</li>
+        <li>Partners are shown as abstract avatars. Each partner is different.</li>
+      </ul>
+
+      <h2>Your Goal</h2>
+      <p>There is no single "correct" strategy. Play however feels right to you. We are interested in your natural decision-making process.</p>
+
+      <p style="margin-top:20px;color:var(--text-muted);font-size:13px;text-align:center">Your responses will be recorded for research purposes. No personally identifying information is collected.</p>
+
+      <div style="text-align:center">
+        <button class="btn" onclick="startPractice()">Begin Practice</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- GAME SCREEN -->
+  <div class="screen" id="game-screen">
+    <div class="practice-badge" id="practice-badge" style="display:none">PRACTICE ROUND</div>
+    <div class="game-hud">
+      <div class="hud-left">
+        <div>
+          <div class="hud-label">Total Tokens</div>
+          <div class="hud-value tokens" id="hud-total">0</div>
+        </div>
+      </div>
+      <div class="hud-partner-info">
+        <div class="hud-partner-name" id="hud-partner-name">Partner A</div>
+        <div class="hud-round" id="hud-round">Round 1 of 10</div>
+      </div>
+      <div class="hud-right">
+        <div>
+          <div class="hud-label">Partner #</div>
+          <div class="hud-value" id="hud-partner-num">1 / 5</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="game-arena">
+      <div class="avatar-area">
+        <div class="avatar-container">
+          <svg class="avatar-svg" id="player-avatar" viewBox="0 0 90 90"></svg>
+          <div class="avatar-label">You</div>
+          <div class="avatar-tokens" id="player-round-tokens">10 tokens</div>
+        </div>
+        <div class="transfer-line" id="transfer-line"></div>
+        <div class="avatar-container">
+          <svg class="avatar-svg partner-avatar" id="partner-avatar-svg" viewBox="0 0 90 90"></svg>
+          <div class="avatar-label" id="partner-label">Partner</div>
+          <div class="avatar-tokens" id="partner-received-tokens">&nbsp;</div>
+        </div>
+      </div>
+
+      <div class="investment-panel" id="investment-panel">
+        <h3>How many tokens will you send to your partner?</h3>
+        <div class="slider-row">
+          <span style="color:var(--text-muted);font-size:13px">0</span>
+          <input type="range" id="token-slider" min="0" max="10" value="5" step="1">
+          <span style="color:var(--text-muted);font-size:13px">10</span>
+          <div class="slider-value" id="slider-display">5</div>
+        </div>
+        <button class="send-btn" id="send-btn" onclick="sendTokens()">SEND</button>
+      </div>
+
+      <div class="outcome-panel" id="outcome-panel">
+        <h3>Round Result</h3>
+        <div class="outcome-details">
+          <div class="outcome-item">
+            <div class="label">You Sent</div>
+            <div class="value sent" id="outcome-sent">0</div>
+          </div>
+          <div class="outcome-item">
+            <div class="label">Partner Got</div>
+            <div class="value" id="outcome-partner-got" style="color:var(--text-dim)">0</div>
+          </div>
+          <div class="outcome-item">
+            <div class="label">Returned</div>
+            <div class="value received-back" id="outcome-returned">0</div>
+          </div>
+          <div class="outcome-item">
+            <div class="label">Your Net</div>
+            <div class="value" id="outcome-net">0</div>
+          </div>
+        </div>
+        <div class="history-bar" id="history-bar"></div>
+        <button class="continue-btn" id="continue-btn" onclick="nextRound()">Continue</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TRANSITION SCREEN -->
+  <div class="screen" id="transition-screen">
+    <div class="transition-content fade-in">
+      <h2>New Partner</h2>
+      <p>You are about to meet a new partner.</p>
+      <p id="transition-partner-info">Partner 2 of 5</p>
+      <svg class="avatar-svg partner-avatar new-avatar-preview" id="transition-avatar" viewBox="0 0 90 90" style="width:110px;height:110px"></svg>
+      <p style="color:var(--text-muted);font-size:13px;margin-top:8px">This partner may behave differently from your previous partner.</p>
+      <button class="btn btn-magenta" onclick="beginPartner()">Meet Partner</button>
+    </div>
+  </div>
+
+  <!-- PRACTICE END SCREEN -->
+  <div class="screen" id="practice-end-screen">
+    <div class="instructions-box fade-in" style="text-align:center;max-width:520px">
+      <h1 style="font-size:22px">Practice Complete</h1>
+      <p style="margin:16px 0">Good. You now understand how the trust game works. The real task will now begin with 5 different partners, 10 rounds each.</p>
+      <p style="color:var(--text-muted);font-size:13px">Remember: each partner has their own strategy. Pay attention to how they respond.</p>
+      <button class="btn btn-green" onclick="startMainTask()">Start Task</button>
+    </div>
+  </div>
+
+  <!-- END SCREEN -->
+  <div class="screen" id="end-screen">
+    <div class="end-box fade-in">
+      <h1>Task Complete</h1>
+      <p style="color:var(--text-muted);margin-bottom:16px">Thank you for participating.</p>
+      <div class="end-stats" id="end-stats"></div>
+      <div class="btn-row">
+        <button class="btn btn-green" onclick="downloadData()">Download Data (CSV)</button>
+        <button class="btn btn-magenta" onclick="downloadJSON()">Download Data (JSON)</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ==================== STATE ====================
+const STATE = {
+  phase: 'instructions', // instructions, practice, transition, main, end
+  isPractice: false,
+  partnerIndex: 0,
+  roundIndex: 0,
+  totalTokens: 0,
+  roundStartTime: 0,
+  currentSliderValue: 5,
+  trialData: [],
+  partnerHistory: [], // amounts sent to current partner per round
+  partnerReturns: [], // amounts returned by current partner per round
+};
+
+const PARTNER_NAMES = ['Alpha','Beta','Gamma','Delta','Epsilon'];
+const PRACTICE_PARTNER_NAME = 'Practice';
+const MAIN_ROUNDS = 10;
+const PRACTICE_ROUNDS = 3;
+const NUM_PARTNERS = 5;
+
+// Partner strategies (order randomized per participant)
+const STRATEGIES = [
+  { id:'generous', label:'Generous' },
+  { id:'selfish', label:'Selfish' },
+  { id:'tit-for-tat', label:'Tit-for-Tat' },
+  { id:'random', label:'Random' },
+  { id:'betrayer', label:'Betrayer' },
+];
+
+let strategyOrder = shuffle([...STRATEGIES]);
+let partnerAvatarSeeds = [];
+for(let i=0;i<NUM_PARTNERS+1;i++) partnerAvatarSeeds.push(Math.floor(Math.random()*99999));
+
+// Player avatar seed
+const playerAvatarSeed = Math.floor(Math.random()*99999);
+
+// Session ID
+const sessionId = 'TG-' + Date.now().toString(36) + '-' + Math.random().toString(36).substr(2,5);
+
+// ==================== AVATAR GENERATION ====================
+function seededRNG(seed){let s=seed;return()=>{s=Math.imul(s^(s>>>16),0x45d9f3b);s=Math.imul(s^(s>>>13),0x45d9f3b);return((s^=s>>>16)>>>0)/4294967296}}
+
+function generateAvatar(svgEl, seed, isPlayer){
+  const rng = seededRNG(seed);
+  // Muted gray tones instead of neon hues
+  const baseLight = 25 + Math.floor(rng()*15); // 25-40% lightness range
+  const bg = `hsl(0,0%,${baseLight - 15}%)`;
+
+  let html = `<rect width="90" height="90" fill="${bg}"/>`;
+
+  // Geometric patterns with muted grays
+  const shapes = 3 + Math.floor(rng()*4);
+  for(let i=0;i<shapes;i++){
+    const type = Math.floor(rng()*4);
+    const cx = 15+rng()*60, cy = 15+rng()*60;
+    const size = 8+rng()*22;
+    // Use varying gray tones
+    const light = baseLight + Math.floor(rng()*20);
+    const alpha = .3+rng()*.5;
+    const fill = `hsla(0,0%,${light}%,${alpha})`;
+    const stroke = `hsla(0,0%,${light+12}%,${alpha+.15})`;
+
+    // consume rng calls to keep seed alignment
+    rng(); // was hue calc
+    rng(); // was sat calc
+
+    if(type===0){
+      html+=`<circle cx="${cx}" cy="${cy}" r="${size/2}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+    } else if(type===1){
+      const pts = [];
+      const sides = 3+Math.floor(rng()*4);
+      for(let j=0;j<sides;j++){
+        const a = (Math.PI*2/sides)*j - Math.PI/2;
+        pts.push(`${cx+Math.cos(a)*size/2},${cy+Math.sin(a)*size/2}`);
+      }
+      html+=`<polygon points="${pts.join(' ')}" fill="${fill}" stroke="${stroke}" stroke-width="1"/>`;
+    } else if(type===2){
+      html+=`<rect x="${cx-size/2}" y="${cy-size/2}" width="${size}" height="${size}" rx="${rng()*size/3}" fill="${fill}" stroke="${stroke}" stroke-width="1" transform="rotate(${rng()*360},${cx},${cy})"/>`;
+    } else {
+      html+=`<line x1="${cx-size/2}" y1="${cy}" x2="${cx+size/2}" y2="${cy}" stroke="${stroke}" stroke-width="${2+rng()*3}" transform="rotate(${rng()*180},${cx},${cy})"/>`;
+    }
+  }
+
+  // Central motif in muted gray
+  const motifLight = isPlayer ? 55 : 45 + Math.floor(rng()*15);
+  html+=`<circle cx="45" cy="45" r="${10+rng()*6}" fill="none" stroke="hsla(0,0%,${motifLight}%,.4)" stroke-width="1.5"/>`;
+  html+=`<circle cx="45" cy="45" r="${4+rng()*3}" fill="hsla(0,0%,${motifLight+10}%,.5)"/>`;
+
+  svgEl.innerHTML = html;
+}
+
+// ==================== PARTNER RETURN LOGIC ====================
+function computeReturn(strategyId, amountSent, roundIndex, partnerHistory, partnerReturns){
+  const received = amountSent * 3;
+  if(received === 0) return 0;
+
+  let returnPct;
+
+  switch(strategyId){
+    case 'generous':
+      returnPct = .4 + Math.random()*.2; // 40-60%
+      break;
+    case 'selfish':
+      returnPct = Math.random()*.15; // 0-15%
+      break;
+    case 'tit-for-tat':
+      if(roundIndex === 0){
+        returnPct = .4 + Math.random()*.1; // start fair
+      } else {
+        // mirror participant's generosity proportion
+        const prevSent = partnerHistory[partnerHistory.length-1] || 5;
+        const prevProportion = prevSent / 10;
+        returnPct = Math.max(0, Math.min(1, prevProportion * (.8 + Math.random()*.4)));
+      }
+      break;
+    case 'random':
+      returnPct = Math.random();
+      break;
+    case 'betrayer':
+      if(roundIndex < 6){
+        returnPct = .45 + Math.random()*.1; // ~50% for rounds 1-6
+      } else {
+        returnPct = Math.random()*.05; // ~0% for rounds 7-10
+      }
+      break;
+    case 'practice':
+      returnPct = .35 + Math.random()*.3; // moderate
+      break;
+    default:
+      returnPct = .33;
+  }
+
+  return Math.round(received * returnPct);
+}
+
+// ==================== UI HELPERS ====================
+function showScreen(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function updateHUD(){
+  document.getElementById('hud-total').textContent = STATE.totalTokens;
+  const maxRounds = STATE.isPractice ? PRACTICE_ROUNDS : MAIN_ROUNDS;
+  document.getElementById('hud-round').textContent = `Round ${STATE.roundIndex+1} of ${maxRounds}`;
+  if(STATE.isPractice){
+    document.getElementById('hud-partner-name').textContent = 'Practice Partner';
+    document.getElementById('hud-partner-num').textContent = 'Practice';
+  } else {
+    document.getElementById('hud-partner-name').textContent = `Partner ${PARTNER_NAMES[STATE.partnerIndex]}`;
+    document.getElementById('hud-partner-num').textContent = `${STATE.partnerIndex+1} / ${NUM_PARTNERS}`;
+  }
+}
+
+function buildHistoryBar(){
+  const maxRounds = STATE.isPractice ? PRACTICE_ROUNDS : MAIN_ROUNDS;
+  const bar = document.getElementById('history-bar');
+  bar.innerHTML = '';
+  for(let i=0;i<maxRounds;i++){
+    const pip = document.createElement('div');
+    pip.className = 'history-pip';
+    if(i < STATE.roundIndex) pip.classList.add('done');
+    if(i === STATE.roundIndex) pip.classList.add('current');
+    bar.appendChild(pip);
+  }
+}
+
+function resetInvestmentPanel(){
+  document.getElementById('investment-panel').style.display = 'block';
+  document.getElementById('outcome-panel').style.display = 'none';
+  document.getElementById('token-slider').value = 5;
+  document.getElementById('slider-display').textContent = '5';
+  STATE.currentSliderValue = 5;
+  document.getElementById('send-btn').disabled = false;
+  document.getElementById('player-round-tokens').textContent = '10 tokens';
+  document.getElementById('partner-received-tokens').innerHTML = '&nbsp;';
+}
+
+// ==================== TOKEN ANIMATION ====================
+function animateTokens(from, to, amount, color, callback){
+  const line = document.getElementById('transfer-line');
+  line.innerHTML = '';
+  if(amount === 0){callback();return}
+
+  const dotColor = '#71717a';
+  const count = Math.min(amount, 6);
+  let done = 0;
+
+  for(let i=0;i<count;i++){
+    const dot = document.createElement('div');
+    dot.className = 'token-anim';
+    dot.style.background = dotColor;
+    line.appendChild(dot);
+
+    const startX = from === 'left' ? -140 : 140;
+    const endX = from === 'left' ? 140 : -140;
+    dot.style.left = `calc(50% + ${startX}px)`;
+    dot.style.transform = 'translateX(-50%)';
+
+    setTimeout(()=>{
+      dot.style.transition = `all ${0.45 + Math.random()*0.15}s ease-in-out`;
+      dot.style.opacity = '1';
+      dot.style.left = `calc(50% + ${endX}px)`;
+
+      setTimeout(()=>{
+        dot.style.opacity = '0';
+        done++;
+        if(done >= count){
+          setTimeout(()=>{line.innerHTML='';callback()}, 100);
+        }
+      }, 450 + i*40);
+    }, i * 80);
+  }
+}
+
+// ==================== CORE GAME LOGIC ====================
+function startPractice(){
+  STATE.phase = 'practice';
+  STATE.isPractice = true;
+  STATE.partnerIndex = 0;
+  STATE.roundIndex = 0;
+  STATE.totalTokens = 0;
+  STATE.partnerHistory = [];
+  STATE.partnerReturns = [];
+
+  showScreen('game-screen');
+  document.getElementById('practice-badge').style.display = 'block';
+
+  generateAvatar(document.getElementById('player-avatar'), playerAvatarSeed, true);
+  generateAvatar(document.getElementById('partner-avatar-svg'), partnerAvatarSeeds[0], false);
+  document.getElementById('partner-label').textContent = 'Practice Partner';
+
+  updateHUD();
+  buildHistoryBar();
+  resetInvestmentPanel();
+  STATE.roundStartTime = performance.now();
+}
+
+function startMainTask(){
+  STATE.phase = 'main';
+  STATE.isPractice = false;
+  STATE.partnerIndex = 0;
+  STATE.roundIndex = 0;
+  STATE.totalTokens = 0;
+  STATE.partnerHistory = [];
+  STATE.partnerReturns = [];
+
+  document.getElementById('practice-badge').style.display = 'none';
+  showTransition();
+}
+
+function showTransition(){
+  const pi = STATE.partnerIndex;
+  document.getElementById('transition-partner-info').textContent = `Partner ${pi+1} of ${NUM_PARTNERS} -- Partner ${PARTNER_NAMES[pi]}`;
+  generateAvatar(document.getElementById('transition-avatar'), partnerAvatarSeeds[pi+1], false);
+  showScreen('transition-screen');
+}
+
+function beginPartner(){
+  STATE.roundIndex = 0;
+  STATE.partnerHistory = [];
+  STATE.partnerReturns = [];
+
+  showScreen('game-screen');
+  generateAvatar(document.getElementById('partner-avatar-svg'), partnerAvatarSeeds[STATE.partnerIndex+1], false);
+  document.getElementById('partner-label').textContent = `Partner ${PARTNER_NAMES[STATE.partnerIndex]}`;
+
+  updateHUD();
+  buildHistoryBar();
+  resetInvestmentPanel();
+  STATE.roundStartTime = performance.now();
+}
+
+function sendTokens(){
+  const btn = document.getElementById('send-btn');
+  if(btn.disabled) return;
+  btn.disabled = true;
+
+  const reactionTime = performance.now() - STATE.roundStartTime;
+  const amountSent = STATE.currentSliderValue;
+  const kept = 10 - amountSent;
+  const partnerReceived = amountSent * 3;
+
+  // Determine strategy
+  const strategyId = STATE.isPractice ? 'practice' : strategyOrder[STATE.partnerIndex].id;
+  const amountReturned = computeReturn(strategyId, amountSent, STATE.roundIndex, STATE.partnerHistory, STATE.partnerReturns);
+  const netGain = kept + amountReturned - 10; // relative to starting 10
+
+  // Update player tokens display
+  document.getElementById('player-round-tokens').textContent = `${kept} kept`;
+
+  // Animate send
+  animateTokens('left','right', amountSent, '#71717a', ()=>{
+    document.getElementById('partner-received-tokens').textContent = `Received ${partnerReceived}`;
+
+    // Short pause then animate return
+    setTimeout(()=>{
+      animateTokens('right','left', Math.min(amountReturned,10), '#71717a', ()=>{
+        showOutcome(amountSent, partnerReceived, amountReturned, netGain);
+      });
+    }, 400);
+  });
+
+  // Record data
+  STATE.partnerHistory.push(amountSent);
+  STATE.partnerReturns.push(amountReturned);
+  STATE.totalTokens += kept + amountReturned;
+
+  // Compute running trust level: average of amounts sent so far to this partner
+  const runningTrust = STATE.partnerHistory.reduce((a,b)=>a+b,0) / STATE.partnerHistory.length;
+
+  // Compute reciprocity index (correlation-like: how much does partner's return influence next send)
+  let reciprocityIndex = null;
+  if(STATE.partnerHistory.length >= 2){
+    // simple: correlation between returns and next investments
+    const returns = STATE.partnerReturns.slice(0,-1);
+    const nextSends = STATE.partnerHistory.slice(1);
+    if(returns.length > 0){
+      const meanR = returns.reduce((a,b)=>a+b,0)/returns.length;
+      const meanS = nextSends.reduce((a,b)=>a+b,0)/nextSends.length;
+      let num=0,denR=0,denS=0;
+      for(let i=0;i<returns.length;i++){
+        const dr=returns[i]-meanR, ds=nextSends[i]-meanS;
+        num+=dr*ds; denR+=dr*dr; denS+=ds*ds;
+      }
+      reciprocityIndex = (denR>0&&denS>0) ? num/Math.sqrt(denR*denS) : 0;
+    }
+  }
+
+  // Detect betrayal response (for betrayer strategy)
+  let betrayalDetectionRound = null;
+  if(strategyId === 'betrayer' && STATE.roundIndex >= 7){
+    // check if participant reduced investment after round 7
+    for(let i=7;i<STATE.partnerHistory.length;i++){
+      if(STATE.partnerHistory[i] < STATE.partnerHistory[i-1] - 1){
+        betrayalDetectionRound = i+1;
+        break;
+      }
+    }
+  }
+
+  // Store trial data
+  if(!STATE.isPractice){
+    STATE.trialData.push({
+      sessionId: sessionId,
+      partnerId: STATE.partnerIndex + 1,
+      partnerName: PARTNER_NAMES[STATE.partnerIndex],
+      strategyType: strategyId,
+      roundNumber: STATE.roundIndex + 1,
+      amountSent: amountSent,
+      amountReceivedByPartner: partnerReceived,
+      amountReturned: amountReturned,
+      kept: kept,
+      roundEarnings: kept + amountReturned,
+      netGainLoss: netGain,
+      reactionTimeMs: Math.round(reactionTime),
+      runningTrustLevel: Math.round(runningTrust*100)/100,
+      reciprocityIndex: reciprocityIndex !== null ? Math.round(reciprocityIndex*1000)/1000 : '',
+      betrayalDetectionRound: betrayalDetectionRound || '',
+      cumulativeTokens: STATE.totalTokens,
+      timestamp: new Date().toISOString(),
+    });
+  }
+}
+
+function showOutcome(sent, partnerGot, returned, net){
+  document.getElementById('investment-panel').style.display = 'none';
+  const op = document.getElementById('outcome-panel');
+  op.style.display = 'block';
+  op.classList.remove('fade-in');
+  void op.offsetWidth;
+  op.classList.add('fade-in');
+
+  document.getElementById('outcome-sent').textContent = sent;
+  document.getElementById('outcome-partner-got').textContent = partnerGot;
+  document.getElementById('outcome-returned').textContent = returned;
+
+  const netEl = document.getElementById('outcome-net');
+  netEl.textContent = (net >= 0 ? '+' : '') + net;
+  netEl.className = 'value ' + (net > 0 ? 'net-pos' : net < 0 ? 'net-neg' : 'net-zero');
+
+  updateHUD();
+  buildHistoryBar();
+}
+
+function nextRound(){
+  STATE.roundIndex++;
+  const maxRounds = STATE.isPractice ? PRACTICE_ROUNDS : MAIN_ROUNDS;
+
+  if(STATE.roundIndex >= maxRounds){
+    // Partner done
+    if(STATE.isPractice){
+      showScreen('practice-end-screen');
+      return;
+    }
+    STATE.partnerIndex++;
+    if(STATE.partnerIndex >= NUM_PARTNERS){
+      showEndScreen();
+      return;
+    }
+    showTransition();
+    return;
+  }
+
+  updateHUD();
+  buildHistoryBar();
+  resetInvestmentPanel();
+  STATE.roundStartTime = performance.now();
+}
+
+// ==================== END SCREEN ====================
+function showEndScreen(){
+  STATE.phase = 'end';
+  showScreen('end-screen');
+
+  const totalEarned = STATE.totalTokens;
+  const avgSent = STATE.trialData.length > 0
+    ? (STATE.trialData.reduce((a,d)=>a+d.amountSent,0)/STATE.trialData.length).toFixed(1)
+    : 0;
+  const totalRounds = STATE.trialData.length;
+
+  const stats = document.getElementById('end-stats');
+  stats.innerHTML = `
+    <div class="end-stat"><div class="label">Total Tokens</div><div class="value">${totalEarned}</div></div>
+    <div class="end-stat"><div class="label">Rounds Played</div><div class="value">${totalRounds}</div></div>
+    <div class="end-stat"><div class="label">Avg. Sent</div><div class="value">${avgSent}</div></div>
+    <div class="end-stat"><div class="label">Partners</div><div class="value">${NUM_PARTNERS}</div></div>
+  `;
+}
+
+// ==================== DATA EXPORT ====================
+function downloadData(){
+  if(STATE.trialData.length === 0) return;
+  const headers = Object.keys(STATE.trialData[0]);
+  const rows = STATE.trialData.map(d => headers.map(h => {
+    const v = d[h];
+    return typeof v === 'string' && v.includes(',') ? `"${v}"` : v;
+  }).join(','));
+  const csv = headers.join(',') + '\n' + rows.join('\n');
+  downloadFile(csv, `trust-game-${sessionId}.csv`, 'text/csv');
+}
+
+function downloadJSON(){
+  if(STATE.trialData.length === 0) return;
+  const data = {
+    sessionId: sessionId,
+    taskType: 'iterated-trust-game',
+    date: new Date().toISOString(),
+    parameters: {
+      partnersCount: NUM_PARTNERS,
+      roundsPerPartner: MAIN_ROUNDS,
+      startingTokensPerRound: 10,
+      multiplier: 3,
+      strategyOrder: strategyOrder.map(s=>s.id),
+    },
+    summary: {
+      totalTokensEarned: STATE.totalTokens,
+      totalRounds: STATE.trialData.length,
+      averageSent: STATE.trialData.reduce((a,d)=>a+d.amountSent,0)/STATE.trialData.length,
+      perPartner: (() => {
+        const byPartner = {};
+        STATE.trialData.forEach(d=>{
+          if(!byPartner[d.partnerId]) byPartner[d.partnerId] = {strategy:d.strategyType,sent:[],returned:[],earnings:[]};
+          byPartner[d.partnerId].sent.push(d.amountSent);
+          byPartner[d.partnerId].returned.push(d.amountReturned);
+          byPartner[d.partnerId].earnings.push(d.roundEarnings);
+        });
+        return Object.entries(byPartner).map(([id,v])=>({
+          partnerId:+id,
+          strategy:v.strategy,
+          avgSent:(v.sent.reduce((a,b)=>a+b,0)/v.sent.length).toFixed(2),
+          avgReturned:(v.returned.reduce((a,b)=>a+b,0)/v.returned.length).toFixed(2),
+          totalEarnings:v.earnings.reduce((a,b)=>a+b,0),
+          trustTrajectory:v.sent,
+        }));
+      })(),
+    },
+    trials: STATE.trialData,
+  };
+  downloadFile(JSON.stringify(data,null,2), `trust-game-${sessionId}.json`, 'application/json');
+}
+
+function downloadFile(content, filename, mime){
+  const blob = new Blob([content],{type:mime});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(a.href);
+}
+
+// ==================== UTILITIES ====================
+function shuffle(arr){
+  for(let i=arr.length-1;i>0;i--){
+    const j=Math.floor(Math.random()*(i+1));
+    [arr[i],arr[j]]=[arr[j],arr[i]];
+  }
+  return arr;
+}
+
+// ==================== SLIDER BINDING ====================
+document.getElementById('token-slider').addEventListener('input', function(){
+  STATE.currentSliderValue = parseInt(this.value);
+  document.getElementById('slider-display').textContent = this.value;
+});
+
+// ==================== KEYBOARD SHORTCUT ====================
+document.addEventListener('keydown', function(e){
+  if(e.key === 'Enter'){
+    const ip = document.getElementById('investment-panel');
+    const op = document.getElementById('outcome-panel');
+    if(ip.style.display !== 'none' && !document.getElementById('send-btn').disabled){
+      sendTokens();
+    } else if(op.style.display !== 'none'){
+      nextRound();
+    }
+  }
+});
+</script>
+</body>
+</html>

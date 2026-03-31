@@ -1,0 +1,762 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Facial Emotion Morphing Task</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{
+    background:#111113;
+    color:#d4d4d8;font-family:'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    min-height:100vh;display:flex;flex-direction:column;align-items:center;
+    overflow-x:hidden;
+  }
+  h1{font-size:1.8rem;margin:18px 0 8px;color:#fafafa;font-weight:700}
+  h2{font-size:1.3rem;margin:10px 0;color:#fafafa;font-weight:600}
+  .screen{display:none;flex-direction:column;align-items:center;width:100%;max-width:900px;padding:10px 20px}
+  .screen.active{display:flex}
+  .btn{
+    background:#27272a;border:1px solid #3f3f46;
+    color:#d4d4d8;padding:10px 24px;margin:6px;border-radius:8px;cursor:pointer;
+    font-size:0.95rem;font-family:inherit;transition:all 0.2s;
+  }
+  .btn:hover{background:#3f3f46}
+  .btn:active{transform:scale(0.96)}
+  .btn-primary{
+    background:#fafafa;border:none;color:#111113;
+    font-size:1.05rem;padding:12px 32px;font-family:inherit;font-weight:600;
+  }
+  .btn-primary:hover{background:#e4e4e7}
+  .btn-emotion{
+    min-width:110px;padding:12px 18px;font-size:1rem;font-weight:600;
+    text-transform:uppercase;letter-spacing:1px;
+    background:#18181b;border:1px solid #3f3f46;color:#d4d4d8;
+    border-radius:8px;font-family:inherit;
+  }
+  .btn-emotion:hover{background:#27272a}
+  .btn-emotion.correct{border-color:#4ade80;background:#14532d}
+  .btn-emotion.incorrect{border-color:#f87171;background:#7f1d1d}
+  #task-canvas{
+    border:1px solid #27272a;border-radius:12px;
+    background:#18181b;
+  }
+  .emotion-buttons{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin:12px 0}
+  .progress-bar-outer{
+    width:80%;max-width:500px;height:8px;background:#18181b;border-radius:4px;
+    margin:8px 0;border:1px solid #27272a;
+  }
+  .progress-bar-inner{height:100%;background:#fafafa;border-radius:4px;transition:width 0.3s}
+  .info-text{color:#71717a;font-size:0.85rem;margin:4px 0}
+  .morph-bar-outer{
+    width:60%;max-width:400px;height:10px;background:#18181b;border-radius:5px;
+    margin:8px 0;border:1px solid #27272a;overflow:hidden;
+  }
+  .morph-bar-inner{height:100%;width:0%;background:#a1a1aa;border-radius:5px;transition:width 0.05s linear}
+  .fixation{font-size:3rem;color:#71717a;margin:40px 0}
+  .instructions-content{
+    background:#18181b;border:1px solid #27272a;border-radius:12px;
+    padding:20px 28px;max-width:750px;line-height:1.6;margin:10px 0;
+  }
+  .instructions-content p{margin:8px 0}
+  .instructions-content ul{margin:8px 0 8px 20px}
+  .instructions-content li{margin:4px 0}
+  .example-grid{display:flex;flex-wrap:wrap;justify-content:center;gap:12px;margin:14px 0}
+  .example-cell{text-align:center;font-size:0.8rem;color:#a1a1aa}
+  .example-cell canvas{border:1px solid #27272a;border-radius:8px;background:#18181b}
+  .feedback-msg{
+    font-size:1.1rem;font-weight:600;margin:8px 0;min-height:28px;
+  }
+  .feedback-msg.correct-msg{color:#4ade80}
+  .feedback-msg.incorrect-msg{color:#f87171}
+  .trial-info{color:#52525b;font-size:0.8rem;margin:2px 0}
+  .summary-table{
+    border-collapse:collapse;margin:12px 0;font-size:0.85rem;
+  }
+  .summary-table th,.summary-table td{
+    border:1px solid #27272a;padding:6px 12px;text-align:center;
+  }
+  .summary-table th{background:#27272a;color:#fafafa}
+  .summary-table td{background:#18181b}
+  .neon-accent{color:#fafafa;font-weight:600}
+  .phase-label{
+    display:inline-block;background:#18181b;border:1px solid #27272a;
+    border-radius:20px;padding:4px 16px;font-size:0.8rem;color:#a1a1aa;margin:4px 0;
+  }
+</style>
+</head>
+<body>
+
+<!-- INSTRUCTIONS SCREEN -->
+<div id="screen-instructions" class="screen active">
+  <h1>Facial Emotion Morphing Task</h1>
+  <div class="instructions-content">
+    <p>In this task, a face will slowly <strong class="neon-accent">morph</strong> from one emotion to another over about 5 seconds.</p>
+    <p>Your job is to <strong>identify the new emotion as early as possible</strong> by clicking one of the 6 emotion buttons below the face.</p>
+    <ul>
+      <li>A face starts showing one emotion and gradually changes to a different emotion.</li>
+      <li>Watch carefully and press the button for the <strong>target emotion</strong> as soon as you recognize it.</li>
+      <li>The faster and more accurately you respond, the better.</li>
+      <li>If you do not respond, the morph will complete and you must still choose an emotion.</li>
+    </ul>
+    <p>The six emotions are shown below:</p>
+  </div>
+  <div class="example-grid" id="example-grid"></div>
+  <div class="instructions-content">
+    <p>You will start with <strong>6 practice trials</strong> (with feedback), followed by <strong>30 main trials</strong>.</p>
+  </div>
+  <button class="btn btn-primary" onclick="startPractice()">Begin Practice</button>
+</div>
+
+<!-- TRIAL SCREEN -->
+<div id="screen-trial" class="screen">
+  <div class="phase-label" id="phase-label">Practice</div>
+  <div class="trial-info" id="trial-info">Trial 1 / 6</div>
+  <div class="progress-bar-outer"><div class="progress-bar-inner" id="progress-bar"></div></div>
+  <canvas id="task-canvas" width="320" height="360"></canvas>
+  <div class="morph-bar-outer"><div class="morph-bar-inner" id="morph-bar"></div></div>
+  <div class="info-text" id="morph-pct-label">Morph: 0%</div>
+  <div class="feedback-msg" id="feedback-msg">&nbsp;</div>
+  <div class="emotion-buttons" id="emotion-buttons"></div>
+</div>
+
+<!-- FIXATION SCREEN -->
+<div id="screen-fixation" class="screen">
+  <div class="fixation">+</div>
+</div>
+
+<!-- END SCREEN -->
+<div id="screen-end" class="screen">
+  <h1>Task Complete</h1>
+  <h2>Thank you for participating!</h2>
+  <div id="summary-container"></div>
+  <button class="btn btn-primary" onclick="downloadData()" style="margin-top:16px">Download Data (CSV)</button>
+  <button class="btn" onclick="downloadJSON()" style="margin-top:6px">Download Data (JSON)</button>
+</div>
+
+<script>
+// ============================================================
+// EMOTION PARAMETER SYSTEM
+// ============================================================
+const EMOTIONS = ['happy','sad','angry','fearful','surprised','disgusted'];
+
+const EMOTION_COLORS = {
+  happy:'#ca8a04', sad:'#6b8aad', angry:'#b05050',
+  fearful:'#9a7abf', surprised:'#5b9ea6', disgusted:'#6b9a6b'
+};
+
+// Parametric face features: each value 0-1 or -1 to 1
+// browAngle: -1=lowered/angry, 0=neutral, 1=raised
+// browTilt: -1=inner down(sad), 0=flat, 1=inner up(angry frown)
+// browHeight: 0=low, 1=high
+// eyeOpen: 0=closed, 0.5=normal, 1=wide
+// mouthCurve: -1=frown, 0=neutral, 1=smile
+// mouthOpen: 0=closed, 1=wide open
+// mouthWidth: 0=narrow, 0.5=normal, 1=wide
+// mouthAsymmetry: 0=symmetric, 1=asymmetric (disgust)
+// noseWrinkle: 0=none, 1=wrinkled
+// browAsymmetry: 0=symmetric, 1=asymmetric
+
+const EMOTION_PARAMS = {
+  happy: {
+    browAngle:0, browTilt:0, browHeight:0.5, eyeOpen:0.55,
+    mouthCurve:0.9, mouthOpen:0.2, mouthWidth:0.75,
+    mouthAsymmetry:0, noseWrinkle:0, browAsymmetry:0
+  },
+  sad: {
+    browAngle:-0.3, browTilt:-0.7, browHeight:0.4, eyeOpen:0.35,
+    mouthCurve:-0.6, mouthOpen:0.05, mouthWidth:0.45,
+    mouthAsymmetry:0, noseWrinkle:0, browAsymmetry:0
+  },
+  angry: {
+    browAngle:-0.6, browTilt:0.8, browHeight:0.25, eyeOpen:0.35,
+    mouthCurve:-0.3, mouthOpen:0.1, mouthWidth:0.5,
+    mouthAsymmetry:0, noseWrinkle:0.3, browAsymmetry:0
+  },
+  fearful: {
+    browAngle:0.6, browTilt:-0.4, browHeight:0.75, eyeOpen:0.85,
+    mouthCurve:-0.2, mouthOpen:0.5, mouthWidth:0.4,
+    mouthAsymmetry:0, noseWrinkle:0, browAsymmetry:0
+  },
+  surprised: {
+    browAngle:0.8, browTilt:0, browHeight:0.9, eyeOpen:0.95,
+    mouthCurve:0, mouthOpen:0.8, mouthWidth:0.35,
+    mouthAsymmetry:0, noseWrinkle:0, browAsymmetry:0
+  },
+  disgusted: {
+    browAngle:-0.4, browTilt:0.5, browHeight:0.35, eyeOpen:0.4,
+    mouthCurve:-0.4, mouthOpen:0.15, mouthWidth:0.55,
+    mouthAsymmetry:0.7, noseWrinkle:0.8, browAsymmetry:0.6
+  }
+};
+
+const NEUTRAL_PARAMS = {
+  browAngle:0, browTilt:0, browHeight:0.5, eyeOpen:0.5,
+  mouthCurve:0, mouthOpen:0, mouthWidth:0.5,
+  mouthAsymmetry:0, noseWrinkle:0, browAsymmetry:0
+};
+
+function lerpParams(a, b, t) {
+  const r = {};
+  for (const k in a) r[k] = a[k] + (b[k] - a[k]) * t;
+  return r;
+}
+
+// ============================================================
+// FACE DRAWING ON CANVAS
+// ============================================================
+function drawFace(ctx, w, h, p) {
+  ctx.clearRect(0, 0, w, h);
+  const cx = w / 2, cy = h / 2 + 10;
+  const headRx = 110, headRy = 140;
+
+  // Head
+  ctx.beginPath();
+  ctx.ellipse(cx, cy, headRx, headRy, 0, 0, Math.PI * 2);
+  ctx.fillStyle = '#e8c89e';
+  ctx.fill();
+  ctx.strokeStyle = '#b09070';
+  ctx.lineWidth = 2;
+  ctx.stroke();
+
+  // Nose wrinkle
+  if (p.noseWrinkle > 0.05) {
+    ctx.save();
+    ctx.globalAlpha = p.noseWrinkle;
+    ctx.strokeStyle = '#c0a080';
+    ctx.lineWidth = 1.5;
+    const ny = cy + 5;
+    for (let i = -1; i <= 1; i += 2) {
+      ctx.beginPath();
+      ctx.moveTo(cx + i * 8, ny - 8);
+      ctx.quadraticCurveTo(cx + i * 14, ny, cx + i * 8, ny + 8);
+      ctx.stroke();
+    }
+    ctx.restore();
+  }
+
+  // Nose
+  ctx.beginPath();
+  ctx.moveTo(cx, cy - 20);
+  ctx.lineTo(cx - 10, cy + 15);
+  ctx.lineTo(cx + 10, cy + 15);
+  ctx.closePath();
+  ctx.fillStyle = '#d4b08c';
+  ctx.fill();
+
+  // Eyes
+  const eyeY = cy - 30;
+  const eyeSpacing = 38;
+  const eyeRx = 18;
+  const eyeRyBase = 12;
+  const eyeOpenness = p.eyeOpen;
+  const eyeRy = eyeRyBase * Math.max(0.15, eyeOpenness);
+
+  for (let side = -1; side <= 1; side += 2) {
+    const ex = cx + side * eyeSpacing;
+    // Eye white
+    ctx.beginPath();
+    ctx.ellipse(ex, eyeY, eyeRx, eyeRy, 0, 0, Math.PI * 2);
+    ctx.fillStyle = '#fff';
+    ctx.fill();
+    ctx.strokeStyle = '#604020';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+    // Iris
+    const irisR = Math.min(8, eyeRy * 0.7);
+    ctx.beginPath();
+    ctx.arc(ex, eyeY, irisR, 0, Math.PI * 2);
+    ctx.fillStyle = '#3a5030';
+    ctx.fill();
+    // Pupil
+    ctx.beginPath();
+    ctx.arc(ex, eyeY, irisR * 0.45, 0, Math.PI * 2);
+    ctx.fillStyle = '#111';
+    ctx.fill();
+
+    // Eyelid lines for narrowed eyes
+    if (eyeOpenness < 0.45) {
+      ctx.save();
+      ctx.globalAlpha = 1 - eyeOpenness / 0.45;
+      ctx.strokeStyle = '#a08060';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(ex - eyeRx, eyeY);
+      ctx.lineTo(ex + eyeRx, eyeY);
+      ctx.stroke();
+      ctx.restore();
+    }
+  }
+
+  // Eyebrows
+  const browBaseY = eyeY - eyeRyBase - 10;
+  for (let side = -1; side <= 1; side += 2) {
+    const bx = cx + side * eyeSpacing;
+    const heightOffset = -p.browHeight * 16;
+    const by = browBaseY + heightOffset;
+
+    // browAngle: positive = raised overall
+    const angleOffset = p.browAngle * 6;
+
+    // browTilt: controls inner vs outer height
+    // positive = inner end higher (angry V), negative = inner end lower (sad)
+    const tiltInner = -p.browTilt * 8 * side;
+    const tiltOuter = p.browTilt * 5 * side;
+
+    // Asymmetry for disgust
+    const asymOffset = (side === 1) ? p.browAsymmetry * 8 : -p.browAsymmetry * 3;
+
+    const innerX = bx - side * 22;
+    const outerX = bx + side * 22;
+    const innerY = by - angleOffset + tiltInner + asymOffset;
+    const outerY = by - angleOffset + tiltOuter - asymOffset * 0.3;
+
+    ctx.beginPath();
+    ctx.moveTo(innerX, innerY);
+    ctx.quadraticCurveTo(bx, Math.min(innerY, outerY) - 4, outerX, outerY);
+    ctx.strokeStyle = '#504030';
+    ctx.lineWidth = 3.5;
+    ctx.stroke();
+  }
+
+  // Mouth
+  const mouthY = cy + 50;
+  const mouthWidthPx = 24 + p.mouthWidth * 30;
+  const curve = p.mouthCurve * 22;
+  const openAmount = p.mouthOpen * 18;
+  const asym = p.mouthAsymmetry;
+
+  if (openAmount > 2) {
+    // Open mouth
+    ctx.beginPath();
+    const leftX = cx - mouthWidthPx;
+    const rightX = cx + mouthWidthPx;
+    const topCurve = -curve * 0.3;
+    const botCurve = curve + openAmount;
+    const asymOffL = asym * 8;
+    const asymOffR = -asym * 5;
+    ctx.moveTo(leftX, mouthY + asymOffL);
+    ctx.quadraticCurveTo(cx, mouthY + topCurve, rightX, mouthY + asymOffR);
+    ctx.quadraticCurveTo(cx, mouthY + botCurve, leftX, mouthY + asymOffL);
+    ctx.closePath();
+    ctx.fillStyle = '#8b2020';
+    ctx.fill();
+    ctx.strokeStyle = '#604030';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Teeth hint for open mouth
+    if (openAmount > 6) {
+      ctx.save();
+      ctx.clip();
+      ctx.fillStyle = '#f0e8e0';
+      const teethY = mouthY + topCurve * 0.3 - 1;
+      ctx.fillRect(cx - mouthWidthPx * 0.6, teethY, mouthWidthPx * 1.2, Math.min(6, openAmount * 0.35));
+      ctx.restore();
+    }
+  } else {
+    // Closed mouth - simple curve
+    const asymOffL = asym * 6;
+    const asymOffR = -asym * 4;
+    ctx.beginPath();
+    ctx.moveTo(cx - mouthWidthPx, mouthY + asymOffL);
+    ctx.quadraticCurveTo(cx, mouthY - curve, cx + mouthWidthPx, mouthY + asymOffR);
+    ctx.strokeStyle = '#604030';
+    ctx.lineWidth = 2.5;
+    ctx.stroke();
+  }
+}
+
+function drawFixation(ctx, w, h) {
+  ctx.clearRect(0, 0, w, h);
+  ctx.fillStyle = '#71717a';
+  ctx.font = '48px sans-serif';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.fillText('+', w / 2, h / 2);
+}
+
+// ============================================================
+// TASK STATE
+// ============================================================
+const MORPH_DURATION = 5000; // ms
+const FIXATION_DURATION = 1000;
+const FEEDBACK_DURATION = 1200;
+const POST_MORPH_TIMEOUT = 3000; // time after morph completes to force response
+
+let canvas, ctx, cw, ch;
+let phase = 'instructions'; // instructions, practice, main, end
+let trials = [];
+let currentTrialIdx = 0;
+let trialData = [];
+let morphStartTime = 0;
+let morphProgress = 0; // 0-1
+let animFrameId = null;
+let responded = false;
+let currentStartParams, currentEndParams;
+let currentStartEmo, currentEndEmo;
+let morphComplete = false;
+let postMorphTimer = null;
+
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ============================================================
+// GENERATE TRIALS
+// ============================================================
+function generatePracticeTrials() {
+  // One trial per emotion: neutral -> emotion
+  const shuffled = [...EMOTIONS];
+  shuffleArray(shuffled);
+  return shuffled.map(emo => ({startEmo:'neutral', endEmo:emo, type:'practice'}));
+}
+
+function generateMainTrials() {
+  // All permutations of 6 emotions (30 pairs)
+  const pairs = [];
+  for (let i = 0; i < EMOTIONS.length; i++) {
+    for (let j = 0; j < EMOTIONS.length; j++) {
+      if (i !== j) pairs.push({startEmo:EMOTIONS[i], endEmo:EMOTIONS[j], type:'main'});
+    }
+  }
+  shuffleArray(pairs);
+  return pairs;
+}
+
+function shuffleArray(arr) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+}
+
+// ============================================================
+// TRIAL FLOW
+// ============================================================
+function startPractice() {
+  phase = 'practice';
+  trials = generatePracticeTrials();
+  currentTrialIdx = 0;
+  trialData = [];
+  document.getElementById('phase-label').textContent = 'Practice';
+  startFixation();
+}
+
+function startMain() {
+  phase = 'main';
+  trials = generateMainTrials();
+  currentTrialIdx = 0;
+  document.getElementById('phase-label').textContent = 'Main Task';
+  startFixation();
+}
+
+function startFixation() {
+  showScreen('screen-fixation');
+  setTimeout(() => startTrial(), FIXATION_DURATION);
+}
+
+function startTrial() {
+  const trial = trials[currentTrialIdx];
+  currentStartEmo = trial.startEmo;
+  currentEndEmo = trial.endEmo;
+  currentStartParams = currentStartEmo === 'neutral' ? {...NEUTRAL_PARAMS} : {...EMOTION_PARAMS[currentStartEmo]};
+  currentEndParams = {...EMOTION_PARAMS[currentEndEmo]};
+
+  responded = false;
+  morphComplete = false;
+  morphProgress = 0;
+  if (postMorphTimer) clearTimeout(postMorphTimer);
+
+  const total = trials.length;
+  const num = currentTrialIdx + 1;
+  document.getElementById('trial-info').textContent = `Trial ${num} / ${total}`;
+  document.getElementById('progress-bar').style.width = ((num - 1) / total * 100) + '%';
+  document.getElementById('feedback-msg').innerHTML = '&nbsp;';
+  document.getElementById('morph-bar').style.width = '0%';
+  document.getElementById('morph-pct-label').textContent = 'Morph: 0%';
+
+  // Reset button styles
+  document.querySelectorAll('.btn-emotion').forEach(b => {
+    b.classList.remove('correct','incorrect');
+    b.disabled = false;
+  });
+
+  showScreen('screen-trial');
+  morphStartTime = performance.now();
+  animFrameId = requestAnimationFrame(animateMorph);
+}
+
+function animateMorph(timestamp) {
+  const elapsed = timestamp - morphStartTime;
+  morphProgress = Math.min(1, elapsed / MORPH_DURATION);
+
+  const params = lerpParams(currentStartParams, currentEndParams, morphProgress);
+  drawFace(ctx, cw, ch, params);
+
+  document.getElementById('morph-bar').style.width = (morphProgress * 100) + '%';
+  document.getElementById('morph-pct-label').textContent = 'Morph: ' + Math.round(morphProgress * 100) + '%';
+
+  if (morphProgress < 1 && !responded) {
+    animFrameId = requestAnimationFrame(animateMorph);
+  } else if (morphProgress >= 1 && !responded) {
+    morphComplete = true;
+    // Give extra time to respond after morph completes
+    postMorphTimer = setTimeout(() => {
+      if (!responded) forceResponse();
+    }, POST_MORPH_TIMEOUT);
+  }
+}
+
+function forceResponse() {
+  // Auto-record a miss
+  recordResponse(null);
+}
+
+function onEmotionClick(emotion) {
+  if (responded) return;
+  recordResponse(emotion);
+}
+
+function recordResponse(emotion) {
+  responded = true;
+  if (animFrameId) cancelAnimationFrame(animFrameId);
+  if (postMorphTimer) clearTimeout(postMorphTimer);
+
+  const rt = performance.now() - morphStartTime;
+  const morphPct = Math.round(morphProgress * 100);
+  const correct = emotion === currentEndEmo;
+  const trial = trials[currentTrialIdx];
+
+  const datum = {
+    trialNumber: currentTrialIdx + 1,
+    phase: trial.type,
+    startEmotion: currentStartEmo,
+    endEmotion: currentEndEmo,
+    response: emotion || 'NONE',
+    morphPercentAtResponse: morphPct,
+    accuracy: emotion ? (correct ? 1 : 0) : 0,
+    reactionTimeMs: Math.round(rt),
+    morphComplete: morphComplete ? 1 : 0
+  };
+  trialData.push(datum);
+
+  // Disable buttons
+  document.querySelectorAll('.btn-emotion').forEach(b => b.disabled = true);
+
+  // Show feedback for practice
+  const fbEl = document.getElementById('feedback-msg');
+  if (phase === 'practice') {
+    if (!emotion) {
+      fbEl.className = 'feedback-msg incorrect-msg';
+      fbEl.textContent = `No response! The emotion was ${currentEndEmo.toUpperCase()}.`;
+    } else if (correct) {
+      fbEl.className = 'feedback-msg correct-msg';
+      fbEl.textContent = `Correct! (${morphPct}% morph, ${Math.round(rt)}ms)`;
+    } else {
+      fbEl.className = 'feedback-msg incorrect-msg';
+      fbEl.textContent = `Incorrect. You said ${emotion}, it was ${currentEndEmo}.`;
+    }
+    // Highlight buttons
+    document.querySelectorAll('.btn-emotion').forEach(b => {
+      if (b.dataset.emotion === currentEndEmo) b.classList.add('correct');
+      if (emotion && b.dataset.emotion === emotion && !correct) b.classList.add('incorrect');
+    });
+  } else {
+    fbEl.innerHTML = '&nbsp;';
+  }
+
+  setTimeout(() => advanceTrial(), phase === 'practice' ? FEEDBACK_DURATION : 400);
+}
+
+function advanceTrial() {
+  currentTrialIdx++;
+  if (currentTrialIdx >= trials.length) {
+    if (phase === 'practice') {
+      // Transition to main
+      startMain();
+    } else {
+      endTask();
+    }
+  } else {
+    startFixation();
+  }
+}
+
+// ============================================================
+// END SCREEN & DATA
+// ============================================================
+function endTask() {
+  phase = 'end';
+  showScreen('screen-end');
+  buildSummary();
+}
+
+function buildSummary() {
+  const mainTrials = trialData.filter(d => d.phase === 'main');
+  if (mainTrials.length === 0) {
+    document.getElementById('summary-container').innerHTML = '<p>No main trial data.</p>';
+    return;
+  }
+
+  const totalCorrect = mainTrials.filter(d => d.accuracy === 1).length;
+  const avgRT = Math.round(mainTrials.reduce((s,d) => s + d.reactionTimeMs, 0) / mainTrials.length);
+  const avgMorph = Math.round(mainTrials.filter(d=>d.response!=='NONE').reduce((s,d) => s + d.morphPercentAtResponse, 0) /
+    Math.max(1, mainTrials.filter(d=>d.response!=='NONE').length));
+
+  // Threshold per emotion
+  let thresholds = {};
+  EMOTIONS.forEach(emo => {
+    const emoTrials = mainTrials.filter(d => d.endEmotion === emo && d.accuracy === 1);
+    if (emoTrials.length > 0) {
+      thresholds[emo] = Math.round(emoTrials.reduce((s,d) => s + d.morphPercentAtResponse, 0) / emoTrials.length);
+    } else {
+      thresholds[emo] = '-';
+    }
+  });
+
+  // Confusion matrix
+  let confusion = {};
+  EMOTIONS.forEach(a => { confusion[a] = {}; EMOTIONS.forEach(b => confusion[a][b] = 0); });
+  mainTrials.forEach(d => {
+    if (d.response !== 'NONE' && EMOTIONS.includes(d.response)) {
+      confusion[d.endEmotion][d.response]++;
+    }
+  });
+
+  let html = `
+    <table class="summary-table">
+      <tr><th>Metric</th><th>Value</th></tr>
+      <tr><td>Accuracy</td><td>${totalCorrect}/${mainTrials.length} (${Math.round(totalCorrect/mainTrials.length*100)}%)</td></tr>
+      <tr><td>Mean RT</td><td>${avgRT} ms</td></tr>
+      <tr><td>Mean Morph % at Response</td><td>${avgMorph}%</td></tr>
+    </table>
+    <h2 style="margin-top:16px">Perceptual Thresholds (Mean Morph % for Correct)</h2>
+    <table class="summary-table">
+      <tr><th>Emotion</th>${EMOTIONS.map(e=>'<th>'+e+'</th>').join('')}</tr>
+      <tr><td>Threshold</td>${EMOTIONS.map(e=>'<td>'+(thresholds[e])+'%</td>').join('')}</tr>
+    </table>
+    <h2 style="margin-top:16px">Confusion Matrix (Target vs Response)</h2>
+    <table class="summary-table">
+      <tr><th>Target \\ Resp</th>${EMOTIONS.map(e=>'<th>'+e.slice(0,3)+'</th>').join('')}</tr>
+      ${EMOTIONS.map(target => '<tr><th>'+target+'</th>' + EMOTIONS.map(resp => {
+        const v = confusion[target][resp];
+        const isCor = target === resp;
+        return '<td style="'+(isCor && v>0?'color:#4ade80;font-weight:bold':'')+'">' + v + '</td>';
+      }).join('') + '</tr>').join('')}
+    </table>
+  `;
+  document.getElementById('summary-container').innerHTML = html;
+}
+
+function downloadData() {
+  if (trialData.length === 0) return;
+  const headers = Object.keys(trialData[0]);
+  let csv = headers.join(',') + '\n';
+  trialData.forEach(row => {
+    csv += headers.map(h => row[h]).join(',') + '\n';
+  });
+  downloadBlob(csv, 'facial-emotion-morphing-data.csv', 'text/csv');
+}
+
+function downloadJSON() {
+  if (trialData.length === 0) return;
+  const mainTrials = trialData.filter(d => d.phase === 'main');
+  // Build confusion matrix for JSON
+  let confusion = {};
+  EMOTIONS.forEach(a => { confusion[a] = {}; EMOTIONS.forEach(b => confusion[a][b] = 0); });
+  mainTrials.forEach(d => {
+    if (d.response !== 'NONE' && EMOTIONS.includes(d.response)) {
+      confusion[d.endEmotion][d.response]++;
+    }
+  });
+  let thresholds = {};
+  EMOTIONS.forEach(emo => {
+    const emoTrials = mainTrials.filter(d => d.endEmotion === emo && d.accuracy === 1);
+    thresholds[emo] = emoTrials.length > 0
+      ? Math.round(emoTrials.reduce((s,d) => s + d.morphPercentAtResponse, 0) / emoTrials.length)
+      : null;
+  });
+  // Response biases: how early each emotion is identified on average
+  let biases = {};
+  EMOTIONS.forEach(emo => {
+    const respTrials = mainTrials.filter(d => d.response === emo);
+    biases[emo] = respTrials.length > 0
+      ? Math.round(respTrials.reduce((s,d) => s + d.morphPercentAtResponse, 0) / respTrials.length)
+      : null;
+  });
+
+  const output = {
+    taskName: 'Facial Emotion Morphing',
+    timestamp: new Date().toISOString(),
+    summary: {
+      totalTrials: mainTrials.length,
+      accuracy: mainTrials.filter(d=>d.accuracy===1).length / Math.max(1,mainTrials.length),
+      meanRT: Math.round(mainTrials.reduce((s,d)=>s+d.reactionTimeMs,0)/Math.max(1,mainTrials.length)),
+      meanMorphPctAtResponse: Math.round(mainTrials.filter(d=>d.response!=='NONE').reduce((s,d)=>s+d.morphPercentAtResponse,0)/Math.max(1,mainTrials.filter(d=>d.response!=='NONE').length)),
+      perceptualThresholds: thresholds,
+      responseBiases: biases,
+      confusionMatrix: confusion
+    },
+    trials: trialData
+  };
+  downloadBlob(JSON.stringify(output, null, 2), 'facial-emotion-morphing-data.json', 'application/json');
+}
+
+function downloadBlob(content, filename, type) {
+  const blob = new Blob([content], {type});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click();
+  document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  canvas = document.getElementById('task-canvas');
+  ctx = canvas.getContext('2d');
+  cw = canvas.width;
+  ch = canvas.height;
+
+  // Build emotion buttons
+  const btnContainer = document.getElementById('emotion-buttons');
+  EMOTIONS.forEach(emo => {
+    const b = document.createElement('button');
+    b.className = 'btn btn-emotion';
+    b.textContent = emo;
+    b.dataset.emotion = emo;
+    b.style.borderColor = EMOTION_COLORS[emo];
+    b.addEventListener('click', () => onEmotionClick(emo));
+    btnContainer.appendChild(b);
+  });
+
+  // Build example faces
+  const grid = document.getElementById('example-grid');
+  EMOTIONS.forEach(emo => {
+    const cell = document.createElement('div');
+    cell.className = 'example-cell';
+    const c = document.createElement('canvas');
+    c.width = 120; c.height = 140;
+    const ectx = c.getContext('2d');
+    drawFace(ectx, 120, 140, EMOTION_PARAMS[emo]);
+    cell.appendChild(c);
+    const label = document.createElement('div');
+    label.textContent = emo.charAt(0).toUpperCase() + emo.slice(1);
+    label.style.color = EMOTION_COLORS[emo];
+    label.style.fontWeight = '600';
+    label.style.marginTop = '4px';
+    cell.appendChild(label);
+    grid.appendChild(cell);
+  });
+}
+
+window.addEventListener('DOMContentLoaded', init);
+</script>
+</body>
+</html>

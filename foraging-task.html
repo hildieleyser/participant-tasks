@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Foraging Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #d4d4d8; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 600px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 8px; padding: 14px 36px; font-size: 1rem; font-family: inherit; font-weight: 600; cursor: pointer; transition: background 0.15s; margin-top: 12px; }
+        .btn:hover { background: #e4e4e7; }
+
+        .game-container { display: flex; flex-direction: column; align-items: center; gap: 20px; width: 100%; max-width: 700px; }
+        .game-header { display: flex; justify-content: space-between; width: 100%; align-items: center; }
+        .score { font-size: 1.5rem; font-weight: 700; color: #fafafa; }
+        .env-info { color: #71717a; font-size: 0.85rem; }
+        .timer-bar { width: 100%; height: 4px; background: #27272a; border-radius: 2px; overflow: hidden; }
+        .timer-fill { height: 100%; background: #d4d4d8; transition: width 0.5s linear; }
+
+        .patch-visual {
+            width: 300px; height: 300px; border-radius: 50%; position: relative;
+            display: flex; align-items: center; justify-content: center; flex-direction: column;
+            background: #18181b; border: 1px solid #27272a;
+            transition: all 0.5s ease;
+        }
+        .patch-label { font-size: 0.85rem; color: #71717a; margin-bottom: 8px; }
+        .patch-reward { font-size: 3rem; font-weight: 800; color: #fafafa; transition: all 0.3s; }
+        .patch-sub { font-size: 0.85rem; color: #52525b; margin-top: 8px; }
+
+        .action-btns { display: flex; gap: 16px; margin-top: 10px; }
+        .harvest-btn {
+            background: #fafafa; color: #111113; border: none; border-radius: 8px;
+            padding: 18px 40px; font-size: 1.1rem; font-family: inherit; font-weight: 600; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .harvest-btn:hover { background: #e4e4e7; }
+        .move-btn {
+            background: #27272a; color: #d4d4d8; border: 1px solid #3f3f46; border-radius: 8px;
+            padding: 18px 40px; font-size: 1.1rem; font-family: inherit; font-weight: 500; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .move-btn:hover { background: #3f3f46; }
+        .move-btn.disabled, .harvest-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+        .harvest-log { max-height: 120px; overflow-y: auto; width: 100%; max-width: 400px; }
+        .harvest-entry { display: flex; justify-content: space-between; padding: 4px 8px; font-size: 0.8rem; color: #52525b; border-bottom: 1px solid #27272a; }
+
+        .travel-overlay {
+            position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.7);
+            display: none; align-items: center; justify-content: center; z-index: 100;
+            flex-direction: column; gap: 16px;
+        }
+        .travel-overlay.active { display: flex; }
+        .travel-text { font-size: 1.3rem; color: #a1a1aa; }
+        .travel-dots span { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: #71717a; margin: 0 4px; animation: travelPulse 1s infinite; }
+        .travel-dots span:nth-child(2) { animation-delay: 0.2s; }
+        .travel-dots span:nth-child(3) { animation-delay: 0.4s; }
+        @keyframes travelPulse { 0%, 100% { opacity: 0.3; } 50% { opacity: 1; } }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 360px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
+        .stat-label { font-size: 0.7rem; color: #52525b; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.3rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Foraging Task</h1>
+    <p>You are foraging for resources in different environments. Each environment has <strong>resource patches</strong> that yield rewards when you harvest.</p>
+    <p>Patches deplete over time — each harvest gives less than the last. You can <strong>move to a new patch</strong>, but traveling takes time.</p>
+    <p>Your goal: <strong>maximize total reward</strong> within each environment's time limit. Decide wisely when to stay and when to move!</p>
+    <button class="btn" onclick="startTask()">Start Foraging</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="game-container">
+        <div class="game-header">
+            <div class="score" id="scoreDisplay">Score: 0</div>
+            <div class="env-info" id="envInfo"></div>
+        </div>
+        <div class="timer-bar"><div class="timer-fill" id="timerFill"></div></div>
+        <div class="patch-visual" id="patchVisual">
+            <div class="patch-label">Current Patch</div>
+            <div class="patch-reward" id="patchReward">+0</div>
+            <div class="patch-sub" id="patchHarvests">Harvests: 0</div>
+        </div>
+        <div class="action-btns">
+            <button class="harvest-btn" id="harvestBtn" onclick="harvest()">Harvest</button>
+            <button class="move-btn" id="moveBtn" onclick="movePatch()">Move to New Patch</button>
+        </div>
+    </div>
+</div>
+
+<div class="travel-overlay" id="travelOverlay">
+    <div class="travel-text">Traveling to new patch...</div>
+    <div class="travel-dots"><span></span><span></span><span></span></div>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Foraging Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="background:#27272a;color:#d4d4d8;border:1px solid #3f3f46;margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+// Environment definitions
+const environments = [
+    { name: 'Practice', depletionRate: 0.8, travelTime: 2000, duration: 60000, initialReward: 50, practice: true },
+    { name: 'Rich-Slow', depletionRate: 0.85, travelTime: 3000, duration: 120000, initialReward: 60 },
+    { name: 'Rich-Fast', depletionRate: 0.65, travelTime: 3000, duration: 120000, initialReward: 80 },
+    { name: 'Poor-Slow', depletionRate: 0.85, travelTime: 1500, duration: 120000, initialReward: 40 },
+    { name: 'Poor-Fast', depletionRate: 0.65, travelTime: 1500, duration: 120000, initialReward: 50 },
+    { name: 'Mixed', depletionRate: 0.75, travelTime: 2500, duration: 120000, initialReward: 55 },
+];
+
+let currentEnv = 0;
+let totalScore = 0;
+let patchScore = 0;
+let patchHarvests = 0;
+let patchNumber = 0;
+let currentReward = 0;
+let envStartTime = 0;
+let envTimer;
+let allData = [];
+let envActions = [];
+let traveling = false;
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    startEnvironment();
+}
+
+function startEnvironment() {
+    if (currentEnv >= environments.length) return endTask();
+    const env = environments[currentEnv];
+
+    patchNumber = 0;
+    envActions = [];
+    newPatch(env);
+
+    document.getElementById('envInfo').textContent = `${env.practice ? 'Practice' : `Env ${currentEnv}/${environments.length - 1}`} · ${env.duration / 1000}s`;
+    document.getElementById('scoreDisplay').textContent = `Score: ${totalScore}`;
+    envStartTime = performance.now();
+
+    // Timer
+    updateTimer(env);
+    envTimer = setInterval(() => updateTimer(env), 500);
+
+    setTimeout(() => {
+        clearInterval(envTimer);
+        document.getElementById('timerFill').style.width = '0%';
+        document.getElementById('harvestBtn').classList.add('disabled');
+        document.getElementById('moveBtn').classList.add('disabled');
+
+        // Save env data
+        allData.push({
+            environment: currentEnv + 1,
+            envName: env.name,
+            practice: !!env.practice,
+            depletionRate: env.depletionRate,
+            travelTimeMs: env.travelTime,
+            initialReward: env.initialReward,
+            durationMs: env.duration,
+            totalPatches: patchNumber,
+            envScore: envActions.reduce((s, a) => s + (a.reward || 0), 0),
+            actions: envActions
+        });
+
+        currentEnv++;
+        setTimeout(startEnvironment, 1500);
+    }, env.duration);
+}
+
+function updateTimer(env) {
+    const elapsed = performance.now() - envStartTime;
+    const pct = Math.max(0, 1 - elapsed / env.duration) * 100;
+    document.getElementById('timerFill').style.width = `${pct}%`;
+}
+
+function newPatch(env) {
+    patchNumber++;
+    patchHarvests = 0;
+    patchScore = 0;
+    currentReward = env.initialReward + (Math.random() - 0.5) * 10;
+    updatePatchVisual(env);
+    document.getElementById('harvestBtn').classList.remove('disabled');
+    document.getElementById('moveBtn').classList.remove('disabled');
+}
+
+function updatePatchVisual(env) {
+    const richness = Math.min(1, currentReward / env.initialReward);
+    const patch = document.getElementById('patchVisual');
+    patch.style.background = '#18181b';
+    patch.style.border = `1px solid rgba(39, 39, 42, ${0.4 + richness * 0.6})`;
+    patch.style.boxShadow = 'none';
+    document.getElementById('patchReward').textContent = `+${Math.round(currentReward)}`;
+    document.getElementById('patchHarvests').textContent = `Harvests: ${patchHarvests}`;
+}
+
+function harvest() {
+    if (traveling) return;
+    const env = environments[currentEnv];
+    const reward = Math.round(currentReward);
+    totalScore += reward;
+    patchScore += reward;
+    patchHarvests++;
+
+    envActions.push({
+        type: 'harvest',
+        patch: patchNumber,
+        harvestNum: patchHarvests,
+        reward: reward,
+        cumulativePatchReward: patchScore,
+        timestamp: performance.now() - envStartTime
+    });
+
+    document.getElementById('scoreDisplay').textContent = `Score: ${totalScore}`;
+
+    // Deplete
+    currentReward *= env.depletionRate;
+    if (currentReward < 1) currentReward = 1;
+    updatePatchVisual(env);
+
+    // Flash
+    const btn = document.getElementById('harvestBtn');
+    btn.style.background = '#e4e4e7';
+    setTimeout(() => btn.style.background = '#fafafa', 200);
+}
+
+function movePatch() {
+    if (traveling) return;
+    const env = environments[currentEnv];
+    traveling = true;
+
+    envActions.push({
+        type: 'move',
+        fromPatch: patchNumber,
+        harvestsInPatch: patchHarvests,
+        patchScore: patchScore,
+        lastReward: Math.round(currentReward),
+        timestamp: performance.now() - envStartTime
+    });
+
+    document.getElementById('harvestBtn').classList.add('disabled');
+    document.getElementById('moveBtn').classList.add('disabled');
+    document.getElementById('travelOverlay').classList.add('active');
+
+    setTimeout(() => {
+        traveling = false;
+        document.getElementById('travelOverlay').classList.remove('active');
+        newPatch(env);
+    }, env.travelTime);
+}
+
+function endTask() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const mainEnvs = allData.filter(e => !e.practice);
+    const totalPatches = mainEnvs.reduce((s, e) => s + e.totalPatches, 0);
+    const totalEnvScore = mainEnvs.reduce((s, e) => s + e.envScore, 0);
+    const avgHarvests = mainEnvs.length > 0 ?
+        mainEnvs.reduce((s, e) => {
+            const moves = e.actions.filter(a => a.type === 'move');
+            return s + (moves.length > 0 ? moves.reduce((ms, m) => ms + m.harvestsInPatch, 0) / moves.length : 0);
+        }, 0) / mainEnvs.length : 0;
+
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-box"><div class="stat-label">Total Score</div><div class="stat-value">${totalEnvScore}</div></div>
+        <div class="stat-box"><div class="stat-label">Patches Visited</div><div class="stat-value">${totalPatches}</div></div>
+        <div class="stat-box"><div class="stat-label">Avg Harvests/Patch</div><div class="stat-value">${avgHarvests.toFixed(1)}</div></div>
+        <div class="stat-box"><div class="stat-label">Environments</div><div class="stat-value">${mainEnvs.length}</div></div>
+    `;
+    localStorage.setItem('completed_foraging-task.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'foraging-task', completedAt: Date.now(), environments: allData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `foraging_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const rows = [['env','envName','actionType','patch','harvestNum','reward','cumulativePatchReward','patchScore','lastReward','timestampMs']];
+    allData.forEach(env => {
+        env.actions.forEach(a => {
+            rows.push([env.environment, env.envName, a.type, a.patch || a.fromPatch, a.harvestNum || '', a.reward || '', a.cumulativePatchReward || '', a.patchScore || '', a.lastReward || '', Math.round(a.timestamp)]);
+        });
+    });
+    const csv = rows.map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `foraging_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mental Rotation Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #e0e0f0; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 550px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 8px; font-family: inherit; padding: 14px 36px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: transform 0.15s, background 0.15s; margin-top: 12px; }
+        .btn:hover { transform: scale(1.04); background: #e4e4e7; }
+
+        .shapes-container { display: flex; gap: 40px; align-items: center; margin: 20px 0; }
+        .shape-panel {
+            background: #18181b; border: 1px solid #27272a; border-radius: 10px;
+            padding: 16px; display: flex; align-items: center; justify-content: center;
+        }
+        .vs-label { font-size: 1.5rem; color: #52525b; font-weight: 700; }
+
+        .response-btns { display: flex; gap: 20px; margin-top: 20px; }
+        .resp-btn {
+            padding: 14px 36px; border-radius: 8px; border: 1px solid #3f3f46; font-size: 1rem;
+            font-weight: 700; cursor: pointer; transition: transform 0.15s, background 0.15s; background: transparent; color: #d4d4d8; font-family: inherit;
+        }
+        .resp-btn:hover { transform: scale(1.05); background: #18181b; }
+        .resp-same { border-color: #3f3f46; color: #d4d4d8; }
+        .resp-mirror { border-color: #3f3f46; color: #d4d4d8; }
+        .resp-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+        .trial-info { color: #52525b; font-size: 0.85rem; margin-bottom: 16px; }
+        .feedback { font-size: 1rem; min-height: 24px; margin-top: 12px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 400px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: #e0e0f0; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Mental Rotation</h1>
+    <p>You will see two shapes side by side. One shape is rotated. Your task: are they the <strong>same shape</strong>, or is one a <strong>mirror image</strong>?</p>
+    <p>Press <strong>S</strong> for Same or <strong>M</strong> for Mirror. Respond as quickly and accurately as possible.</p>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="trial-info" id="trialInfo"></div>
+    <div class="shapes-container">
+        <div class="shape-panel"><canvas id="shapeL" width="200" height="200"></canvas></div>
+        <div class="vs-label">vs</div>
+        <div class="shape-panel"><canvas id="shapeR" width="200" height="200"></canvas></div>
+    </div>
+    <div class="response-btns">
+        <button class="resp-btn resp-same disabled" id="btnSame" onclick="respond('same')">Same (S)</button>
+        <button class="resp-btn resp-mirror disabled" id="btnMirror" onclick="respond('mirror')">Mirror (M)</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="background:#27272a;color:#d4d4d8;margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+const BLOCK_SIZE = 24;
+const CELL = 30;
+const PRACTICE_TRIALS = 8;
+const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+
+// Polyomino shapes (relative cell positions, 5-6 blocks)
+const shapeTemplates = [
+    [[0,0],[1,0],[2,0],[2,1],[2,2]],       // L shape
+    [[0,0],[1,0],[1,1],[2,1],[2,2]],       // S shape
+    [[0,0],[0,1],[1,1],[2,1],[2,0]],       // U shape
+    [[0,0],[1,0],[1,1],[1,2],[2,2]],       // Z shape
+    [[0,0],[1,0],[2,0],[1,1],[1,2]],       // T shape
+    [[0,0],[0,1],[1,1],[2,1],[2,2],[1,0]], // cross-like
+    [[0,0],[1,0],[2,0],[3,0],[3,1]],       // long L
+    [[0,0],[0,1],[1,0],[2,0],[2,1]],       // C shape
+];
+
+let trials = [];
+let currentTrial = 0;
+let trialData = [];
+let stimOnsetTime = 0;
+let responded = false;
+
+function generateTrials() {
+    const t = [];
+
+    // Practice
+    for (let i = 0; i < PRACTICE_TRIALS; i++) {
+        const angle = angles[i % angles.length];
+        t.push({ angle, isMirror: i % 2 === 0, practice: true, shapeIdx: i % shapeTemplates.length });
+    }
+
+    // Main: 8 angles × 2 types × 6 reps = 96
+    for (const angle of angles) {
+        for (const mirror of [false, true]) {
+            for (let r = 0; r < 6; r++) {
+                t.push({ angle, isMirror: mirror, practice: false, shapeIdx: Math.floor(Math.random() * shapeTemplates.length) });
+            }
+        }
+    }
+
+    // Shuffle main
+    const practice = t.filter(x => x.practice);
+    const main = t.filter(x => !x.practice);
+    for (let i = main.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [main[i], main[j]] = [main[j], main[i]];
+    }
+    return [...practice, ...main];
+}
+
+function drawShape(ctx, cells, mirror = false) {
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+
+    const color = '#d4d4d8';
+    const borderColor = '#71717a';
+
+    cells.forEach(([cx, cy]) => {
+        let dx = cx, dy = cy;
+        if (mirror) dx = -dx;
+        const x = dx * CELL - CELL, y = dy * CELL - CELL;
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        ctx.strokeStyle = borderColor; ctx.lineWidth = 1;
+        ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+    });
+    ctx.restore();
+}
+
+function drawShapeRotated(ctx, cells, angle, mirror = false) {
+    const w = ctx.canvas.width, h = ctx.canvas.height;
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(angle * Math.PI / 180);
+
+    const color = '#d4d4d8';
+    const borderColor = '#71717a';
+
+    cells.forEach(([cx, cy]) => {
+        let dx = cx, dy = cy;
+        if (mirror) dx = -dx;
+        const x = dx * CELL - CELL, y = dy * CELL - CELL;
+        ctx.fillStyle = color;
+        ctx.fillRect(x + 1, y + 1, CELL - 2, CELL - 2);
+        ctx.strokeStyle = borderColor; ctx.lineWidth = 1;
+        ctx.strokeRect(x + 1, y + 1, CELL - 2, CELL - 2);
+    });
+    ctx.restore();
+}
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    trials = generateTrials();
+    showFixation();
+}
+
+function showFixation() {
+    if (currentTrial >= trials.length) return endTask();
+    const trial = trials[currentTrial];
+
+    document.getElementById('trialInfo').textContent = trial.practice
+        ? `Practice ${currentTrial + 1}/${PRACTICE_TRIALS}`
+        : `Trial ${currentTrial - PRACTICE_TRIALS + 1}/${trials.length - PRACTICE_TRIALS}`;
+    document.getElementById('feedback').textContent = '';
+
+    // Clear canvases
+    const ctxL = document.getElementById('shapeL').getContext('2d');
+    const ctxR = document.getElementById('shapeR').getContext('2d');
+    ctxL.clearRect(0, 0, 200, 200);
+    ctxR.clearRect(0, 0, 200, 200);
+
+    // Fixation
+    [ctxL, ctxR].forEach(c => {
+        c.fillStyle = '#52525b'; c.font = '36px system-ui'; c.textAlign = 'center';
+        c.fillText('+', 100, 108);
+    });
+
+    document.getElementById('btnSame').classList.add('disabled');
+    document.getElementById('btnMirror').classList.add('disabled');
+
+    setTimeout(() => showStimuli(trial), 500);
+}
+
+function showStimuli(trial) {
+    const cells = shapeTemplates[trial.shapeIdx];
+    const ctxL = document.getElementById('shapeL').getContext('2d');
+    const ctxR = document.getElementById('shapeR').getContext('2d');
+
+    // Left: original
+    drawShape(ctxL, cells, false);
+
+    // Right: rotated, possibly mirrored
+    drawShapeRotated(ctxR, cells, trial.angle, trial.isMirror);
+
+    responded = false;
+    stimOnsetTime = performance.now();
+    document.getElementById('btnSame').classList.remove('disabled');
+    document.getElementById('btnMirror').classList.remove('disabled');
+}
+
+function respond(response) {
+    if (responded) return;
+    responded = true;
+    const rt = performance.now() - stimOnsetTime;
+    const trial = trials[currentTrial];
+    const correctAnswer = trial.isMirror ? 'mirror' : 'same';
+    const correct = response === correctAnswer;
+
+    trialData.push({
+        trial: currentTrial + 1,
+        practice: trial.practice,
+        shapeIdx: trial.shapeIdx,
+        angle: trial.angle,
+        isMirror: trial.isMirror,
+        response: response,
+        correct: correct,
+        reactionTimeMs: Math.round(rt * 100) / 100,
+        timestamp: Date.now()
+    });
+
+    if (trial.practice) {
+        const fb = document.getElementById('feedback');
+        fb.textContent = correct ? 'Correct!' : `Incorrect — it was ${correctAnswer}`;
+        fb.style.color = correct ? '#4ade80' : '#f87171';
+    }
+
+    document.getElementById('btnSame').classList.add('disabled');
+    document.getElementById('btnMirror').classList.add('disabled');
+
+    currentTrial++;
+    setTimeout(showFixation, trial.practice ? 1200 : 500);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 's' || e.key === 'S') respond('same');
+    if (e.key === 'm' || e.key === 'M') respond('mirror');
+});
+
+function endTask() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const main = trialData.filter(t => !t.practice);
+    const accuracy = main.filter(t => t.correct).length / main.length * 100;
+    const meanRT = main.filter(t => t.correct).reduce((s, t) => s + t.reactionTimeMs, 0) / main.filter(t => t.correct).length;
+
+    // RT by angle (correct trials only)
+    const byAngle = {};
+    main.filter(t => t.correct && !t.isMirror).forEach(t => {
+        const a = Math.min(t.angle, 360 - t.angle); // canonical rotation
+        if (!byAngle[a]) byAngle[a] = [];
+        byAngle[a].push(t.reactionTimeMs);
+    });
+
+    // Rotation rate (slope of RT vs angle)
+    const points = Object.entries(byAngle).map(([a, rts]) => ({ x: +a, y: rts.reduce((s, r) => s + r, 0) / rts.length }));
+    let rotRate = 0;
+    if (points.length >= 2) {
+        const mx = points.reduce((s, p) => s + p.x, 0) / points.length;
+        const my = points.reduce((s, p) => s + p.y, 0) / points.length;
+        const num = points.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0);
+        const den = points.reduce((s, p) => s + (p.x - mx) ** 2, 0);
+        rotRate = den > 0 ? num / den : 0;
+    }
+
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-box"><div class="stat-label">Accuracy</div><div class="stat-value">${accuracy.toFixed(1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Mean RT (correct)</div><div class="stat-value">${(meanRT/1000).toFixed(2)}s</div></div>
+        <div class="stat-box"><div class="stat-label">Rotation Rate</div><div class="stat-value">${rotRate.toFixed(1)} ms/°</div></div>
+        <div class="stat-box"><div class="stat-label">Total Trials</div><div class="stat-value">${main.length}</div></div>
+    `;
+    localStorage.setItem('completed_mental-rotation.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'mental-rotation', completedAt: Date.now(), trials: trialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `rotation_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['trial','practice','shapeIdx','angle','isMirror','response','correct','reactionTimeMs'];
+    const rows = trialData.map(t => headers.map(h => t[h] ?? ''));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `rotation_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>

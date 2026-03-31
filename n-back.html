@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>N-Back Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #a1a1aa; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        h2 { font-size: 1.4rem; color: #fafafa; margin-bottom: 16px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 550px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 8px; font-family: inherit; padding: 14px 36px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s; margin-top: 12px; }
+        .btn:hover { background: #e4e4e7; }
+
+        .stimulus-area {
+            width: 200px; height: 200px; border-radius: 12px; border: 1px solid #27272a;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 5rem; font-weight: 800; color: #fafafa;
+            background: #18181b; transition: border-color 0.3s, background 0.3s;
+            margin: 30px 0;
+        }
+        .stimulus-area.distractor-border { border-color: #52525b; }
+        .stimulus-area.distractor-pulse { animation: bgPulse 0.5s; }
+        .stimulus-area.distractor-dash { border-style: dashed; border-color: #52525b; }
+        @keyframes bgPulse { 0%, 100% { background: #18181b; } 50% { background: #1f1f23; } }
+
+        .stimulus-area.hit { border-color: #27272a; }
+        .stimulus-area.miss { }
+        .stimulus-area.false-alarm { }
+
+        .n-level { font-size: 1.2rem; font-weight: 700; color: #a1a1aa; }
+        .hint { font-size: 0.85rem; color: #52525b; margin-top: 8px; }
+        .progress-info { color: #52525b; font-size: 0.85rem; position: absolute; top: 20px; right: 24px; }
+        .response-hint { font-size: 0.9rem; color: #71717a; margin-top: 16px; }
+        .feedback-text { font-size: 1rem; min-height: 24px; margin-top: 8px; }
+
+        .block-summary { text-align: center; max-width: 400px; }
+        .block-stat { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #27272a; }
+        .block-stat-label { color: #71717a; }
+        .block-stat-value { font-weight: 700; color: #a1a1aa; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin: 20px 0; max-width: 500px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: #52525b; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: #a1a1aa; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>N-Back Task</h1>
+    <p>You will see a sequence of letters, one at a time. Press <strong>Spacebar</strong> if the current letter matches the one shown <strong>N steps back</strong>.</p>
+    <p>For example, in <strong>2-back</strong>: if you see A-B-<strong>A</strong>, press Space on the second A because it matches 2 steps back.</p>
+    <p>You'll start with 1-back (easy) and progress to 3-back. Some trials will have visual distractors — try to ignore them!</p>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="progress-info" id="progressInfo"></div>
+    <div class="n-level" id="nLevel"></div>
+    <div class="stimulus-area" id="stimArea"></div>
+    <div class="response-hint">Press <strong>Space</strong> if it matches <span id="nBack">1</span>-back</div>
+    <div class="feedback-text" id="feedbackText"></div>
+</div>
+
+<div class="screen" id="blockScreen">
+    <div class="block-summary" id="blockSummary"></div>
+    <button class="btn" onclick="nextBlock()">Continue</button>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+const letters = 'BCDFGHJKLMNPQRSTVWXZ'.split('');
+const STIM_DURATION = 500;
+const ISI = 2000;
+const TRIALS_PER_BLOCK = 20;
+const TARGET_RATE = 0.3;
+
+// Block schedule: practice(1-back), then 3x1-back, 3x2-back, 3x3-back
+const blockSchedule = [
+    { n: 1, practice: true },
+    { n: 1 }, { n: 1 }, { n: 1 },
+    { n: 2 }, { n: 2 }, { n: 2 },
+    { n: 3 }, { n: 3 }, { n: 3 },
+];
+
+let currentBlock = 0;
+let trialIndex = 0;
+let sequence = [];
+let blockTrialData = [];
+let allTrialData = [];
+let blockResults = [];
+let responded = false;
+let stimOnsetTime = 0;
+let currentPhase = 'idle';
+
+function generateSequence(n, numTrials) {
+    const seq = [];
+    const isTarget = [];
+
+    for (let i = 0; i < numTrials; i++) {
+        if (i >= n && Math.random() < TARGET_RATE) {
+            seq.push(seq[i - n]);
+            isTarget.push(true);
+        } else {
+            let letter;
+            do { letter = letters[Math.floor(Math.random() * letters.length)]; }
+            while (i >= n && letter === seq[i - n]); // avoid accidental matches
+            seq.push(letter);
+            isTarget.push(false);
+        }
+    }
+
+    // Add distractors
+    const distractors = [];
+    const types = ['border', 'pulse', 'dash'];
+    for (let i = 0; i < numTrials; i++) {
+        if (Math.random() < 0.3) {
+            distractors.push(types[Math.floor(Math.random() * types.length)]);
+        } else {
+            distractors.push(null);
+        }
+    }
+
+    return { seq, isTarget, distractors };
+}
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    startBlock();
+}
+
+function startBlock() {
+    if (currentBlock >= blockSchedule.length) return endTask();
+    const block = blockSchedule[currentBlock];
+    sequence = generateSequence(block.n, TRIALS_PER_BLOCK);
+    trialIndex = 0;
+    blockTrialData = [];
+
+    document.getElementById('nLevel').textContent = `${block.n}-Back ${block.practice ? '(Practice)' : ''}`;
+    document.getElementById('nBack').textContent = block.n;
+    document.getElementById('progressInfo').textContent = block.practice ? 'Practice' : `Block ${currentBlock}/${blockSchedule.length - 1}`;
+
+    document.getElementById('blockScreen').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+
+    setTimeout(showStimulus, 1000);
+}
+
+function showStimulus() {
+    if (trialIndex >= TRIALS_PER_BLOCK) return endBlock();
+
+    const stimArea = document.getElementById('stimArea');
+    responded = false;
+    currentPhase = 'stimulus';
+    document.getElementById('feedbackText').textContent = '';
+
+    // Show letter
+    stimArea.textContent = sequence.seq[trialIndex];
+    stimArea.className = 'stimulus-area';
+
+    // Apply distractor
+    const dist = sequence.distractors[trialIndex];
+    if (dist === 'border') stimArea.classList.add('distractor-border');
+    else if (dist === 'pulse') stimArea.classList.add('distractor-pulse');
+    else if (dist === 'dash') stimArea.classList.add('distractor-dash');
+
+    stimOnsetTime = performance.now();
+
+    // Hide after duration
+    setTimeout(() => {
+        stimArea.textContent = '+';
+        stimArea.className = 'stimulus-area';
+        currentPhase = 'isi';
+
+        // Score at end of ISI
+        setTimeout(() => {
+            scoreTrial();
+            trialIndex++;
+            showStimulus();
+        }, ISI);
+    }, STIM_DURATION);
+}
+
+function scoreTrial() {
+    const block = blockSchedule[currentBlock];
+    const isTarget = sequence.isTarget[trialIndex];
+    let outcome;
+
+    if (isTarget && responded) outcome = 'hit';
+    else if (isTarget && !responded) outcome = 'miss';
+    else if (!isTarget && responded) outcome = 'false_alarm';
+    else outcome = 'correct_rejection';
+
+    const record = {
+        block: currentBlock + 1,
+        practice: !!block.practice,
+        nLevel: block.n,
+        trialInBlock: trialIndex + 1,
+        stimulus: sequence.seq[trialIndex],
+        isTarget: isTarget,
+        distractor: sequence.distractors[trialIndex],
+        response: responded,
+        outcome: outcome,
+        reactionTimeMs: responded ? blockTrialData[blockTrialData.length]?.rt || null : null,
+        timestamp: Date.now()
+    };
+
+    // Fix RT - it was stored in the keydown handler
+    if (responded && blockTrialData.length > 0) {
+        record.reactionTimeMs = blockTrialData[blockTrialData.length - 1];
+    }
+
+    blockTrialData.push(record);
+
+    // Practice feedback
+    if (block.practice) {
+        const fb = document.getElementById('feedbackText');
+        const stimArea = document.getElementById('stimArea');
+        if (outcome === 'hit') { fb.textContent = 'Correct!'; fb.style.color = '#4ade80'; }
+        else if (outcome === 'miss') { fb.textContent = 'Missed - that was a match!'; fb.style.color = '#ef4444'; }
+        else if (outcome === 'false_alarm') { fb.textContent = 'Not a match!'; fb.style.color = '#ef4444'; }
+        else { fb.textContent = ''; }
+    }
+}
+
+let lastRT = null;
+document.addEventListener('keydown', (e) => {
+    if (e.code === 'Space' && (currentPhase === 'stimulus' || currentPhase === 'isi') && !responded) {
+        e.preventDefault();
+        responded = true;
+        lastRT = performance.now() - stimOnsetTime;
+
+        // Store RT for the current trial
+        blockTrialData.push(Math.round(lastRT * 100) / 100);
+
+        const stimArea = document.getElementById('stimArea');
+        stimArea.style.borderColor = '#52525b';
+        setTimeout(() => stimArea.style.borderColor = '', 200);
+    }
+});
+
+function endBlock() {
+    // Compute block stats
+    const trials = blockTrialData.filter(t => typeof t === 'object');
+    const hits = trials.filter(t => t.outcome === 'hit').length;
+    const misses = trials.filter(t => t.outcome === 'miss').length;
+    const fas = trials.filter(t => t.outcome === 'false_alarm').length;
+    const crs = trials.filter(t => t.outcome === 'correct_rejection').length;
+
+    // d-prime with log-linear correction
+    const hr = (hits + 0.5) / (hits + misses + 1);
+    const far = (fas + 0.5) / (fas + crs + 1);
+    const dPrime = inversePhi(hr) - inversePhi(far);
+    const criterion = -0.5 * (inversePhi(hr) + inversePhi(far));
+
+    const accuracy = trials.length > 0 ? ((hits + crs) / trials.length * 100) : 0;
+
+    const result = {
+        block: currentBlock + 1,
+        n: blockSchedule[currentBlock].n,
+        practice: !!blockSchedule[currentBlock].practice,
+        hits, misses, falseAlarms: fas, correctRejections: crs,
+        accuracy: Math.round(accuracy * 10) / 10,
+        dPrime: Math.round(dPrime * 1000) / 1000,
+        criterion: Math.round(criterion * 1000) / 1000
+    };
+    blockResults.push(result);
+
+    // Add individual trials to allTrialData
+    trials.forEach(t => allTrialData.push(t));
+
+    // Show block summary
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('blockScreen').classList.add('active');
+
+    const block = blockSchedule[currentBlock];
+    document.getElementById('blockSummary').innerHTML = `
+        <h2>${block.n}-Back Block Complete</h2>
+        <div class="block-stat"><span class="block-stat-label">Accuracy</span><span class="block-stat-value">${accuracy.toFixed(1)}%</span></div>
+        <div class="block-stat"><span class="block-stat-label">Hits</span><span class="block-stat-value">${hits}/${hits + misses}</span></div>
+        <div class="block-stat"><span class="block-stat-label">False Alarms</span><span class="block-stat-value">${fas}</span></div>
+        <div class="block-stat"><span class="block-stat-label">d'</span><span class="block-stat-value">${dPrime.toFixed(2)}</span></div>
+    `;
+
+    currentBlock++;
+}
+
+function nextBlock() {
+    startBlock();
+}
+
+// Inverse normal CDF approximation (Beasley-Springer-Moro)
+function inversePhi(p) {
+    if (p <= 0) return -5; if (p >= 1) return 5;
+    const a = [-3.969683028665376e1, 2.209460984245205e2, -2.759285104469687e2, 1.383577518672690e2, -3.066479806614716e1, 2.506628277459239e0];
+    const b = [-5.447609879822406e1, 1.615858368580409e2, -1.556989798598866e2, 6.680131188771972e1, -1.328068155288572e1];
+    const c = [-7.784894002430293e-3, -3.223964580411365e-1, -2.400758277161838e0, -2.549732539343734e0, 4.374664141464968e0, 2.938163982698783e0];
+    const d = [7.784695709041462e-3, 3.224671290700398e-1, 2.445134137142996e0, 3.754408661907416e0];
+
+    const pLow = 0.02425, pHigh = 1 - pLow;
+    let q, r;
+
+    if (p < pLow) {
+        q = Math.sqrt(-2 * Math.log(p));
+        return (((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+    } else if (p <= pHigh) {
+        q = p - 0.5; r = q * q;
+        return (((((a[0]*r+a[1])*r+a[2])*r+a[3])*r+a[4])*r+a[5])*q / (((((b[0]*r+b[1])*r+b[2])*r+b[3])*r+b[4])*r+1);
+    } else {
+        q = Math.sqrt(-2 * Math.log(1 - p));
+        return -(((((c[0]*q+c[1])*q+c[2])*q+c[3])*q+c[4])*q+c[5]) / ((((d[0]*q+d[1])*q+d[2])*q+d[3])*q+1);
+    }
+}
+
+function endTask() {
+    document.getElementById('blockScreen').classList.remove('active');
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const mainBlocks = blockResults.filter(b => !b.practice);
+    const byN = {};
+    mainBlocks.forEach(b => {
+        if (!byN[b.n]) byN[b.n] = [];
+        byN[b.n].push(b);
+    });
+
+    let html = '';
+    for (const n of [1, 2, 3]) {
+        const blocks = byN[n] || [];
+        const avgD = blocks.reduce((s, b) => s + b.dPrime, 0) / blocks.length;
+        const avgAcc = blocks.reduce((s, b) => s + b.accuracy, 0) / blocks.length;
+        html += `
+            <div class="stat-box"><div class="stat-label">${n}-Back d'</div><div class="stat-value">${avgD.toFixed(2)}</div></div>
+            <div class="stat-box"><div class="stat-label">${n}-Back Acc</div><div class="stat-value">${avgAcc.toFixed(1)}%</div></div>
+        `;
+    }
+    document.getElementById('statsGrid').innerHTML = html;
+    localStorage.setItem('completed_n-back.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'n-back', completedAt: Date.now(), blockSummaries: blockResults, trials: allTrialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `nback_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['block','practice','nLevel','trialInBlock','stimulus','isTarget','distractor','response','outcome','reactionTimeMs'];
+    const rows = allTrialData.map(t => headers.map(h => t[h] ?? ''));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `nback_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Visual Search Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #e0e0f0; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 600px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 8px; padding: 14px 36px; font-size: 1rem; font-weight: 700; font-family: inherit; cursor: pointer; transition: background 0.15s; margin-top: 12px; }
+        .btn:hover { background: #e4e4e7; }
+
+        canvas { border: 1px solid #27272a; border-radius: 12px; cursor: crosshair; }
+        .response-btns { display: flex; gap: 16px; margin-top: 16px; }
+        .resp-btn { padding: 12px 32px; border-radius: 10px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s; font-family: inherit; }
+        .resp-btn:hover { background: #18181b; }
+        .resp-present { border: 1px solid #3f3f46; color: #d4d4d8; background: transparent; }
+        .resp-absent { border: 1px solid #3f3f46; color: #d4d4d8; background: transparent; }
+        .resp-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+        .trial-info { color: #52525b; font-size: 0.85rem; margin-bottom: 12px; }
+        .feedback { font-size: 1rem; min-height: 24px; margin-top: 10px; }
+
+        .example-row { display: flex; gap: 20px; margin: 16px 0; align-items: center; }
+        .example-item { display: flex; align-items: center; gap: 8px; color: #a1a1aa; font-size: 0.9rem; }
+        .example-shape { width: 24px; height: 24px; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 400px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Visual Search</h1>
+    <p>Find the <strong style="color:#ef4444;">red circle</strong> among other shapes. If you see it, press <strong>Y</strong> (or click Present). If it's not there, press <strong>N</strong> (or click Absent).</p>
+    <p>There are two types of searches:</p>
+    <p><strong>Feature search:</strong> Red circle among <span style="color:#3b82f6;">blue circles</span><br>
+    <strong>Conjunction search:</strong> Red circle among <span style="color:#ef4444;">red squares</span> and <span style="color:#3b82f6;">blue circles</span></p>
+    <p>Respond as <strong>quickly and accurately</strong> as possible.</p>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="trial-info" id="trialInfo"></div>
+    <canvas id="canvas" width="700" height="500"></canvas>
+    <div class="response-btns">
+        <button class="resp-btn resp-present disabled" id="btnPresent" onclick="respond(true)">Present (Y)</button>
+        <button class="resp-btn resp-absent disabled" id="btnAbsent" onclick="respond(false)">Absent (N)</button>
+    </div>
+    <div class="feedback" id="feedback"></div>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const CW = canvas.width, CH = canvas.height;
+
+const setSizes = [4, 8, 16, 24, 32];
+const searchTypes = ['feature', 'conjunction'];
+const PRACTICE_TRIALS = 8;
+const TRIALS_PER_CONDITION = 6; // 2 types × 5 sizes × 2 present/absent × 6 reps = would be 120, let's do 3 reps = 60 + practices
+
+let trials = [];
+let currentTrial = 0;
+let trialData = [];
+let stimOnsetTime = 0;
+let responded = false;
+let targetLoc = null;
+let isPractice = false;
+
+function generateTrials() {
+    const t = [];
+    // Practice
+    for (let i = 0; i < PRACTICE_TRIALS; i++) {
+        t.push({
+            searchType: searchTypes[i % 2],
+            setSize: setSizes[Math.floor(Math.random() * 3)], // easier sizes for practice
+            targetPresent: i % 2 === 0,
+            practice: true
+        });
+    }
+    // Main
+    for (const type of searchTypes) {
+        for (const size of setSizes) {
+            for (const present of [true, false]) {
+                for (let r = 0; r < 3; r++) {
+                    t.push({ searchType: type, setSize: size, targetPresent: present, practice: false });
+                }
+            }
+        }
+    }
+    // Shuffle main trials
+    const practice = t.filter(x => x.practice);
+    const main = t.filter(x => !x.practice);
+    for (let i = main.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [main[i], main[j]] = [main[j], main[i]];
+    }
+    return [...practice, ...main];
+}
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    trials = generateTrials();
+    showFixation();
+}
+
+function showFixation() {
+    if (currentTrial >= trials.length) return endTask();
+    const trial = trials[currentTrial];
+    isPractice = trial.practice;
+
+    document.getElementById('trialInfo').textContent = trial.practice
+        ? `Practice ${currentTrial + 1}/${PRACTICE_TRIALS}`
+        : `Trial ${currentTrial - PRACTICE_TRIALS + 1}/${trials.length - PRACTICE_TRIALS}`;
+    document.getElementById('feedback').textContent = '';
+
+    // Fixation
+    ctx.fillStyle = '#18181b'; ctx.fillRect(0, 0, CW, CH);
+    ctx.fillStyle = '#52525b'; ctx.font = '36px system-ui'; ctx.textAlign = 'center';
+    ctx.fillText('+', CW / 2, CH / 2);
+
+    document.getElementById('btnPresent').classList.add('disabled');
+    document.getElementById('btnAbsent').classList.add('disabled');
+
+    setTimeout(showDisplay, 500 + Math.random() * 300);
+}
+
+function showDisplay() {
+    const trial = trials[currentTrial];
+    ctx.fillStyle = '#18181b'; ctx.fillRect(0, 0, CW, CH);
+
+    const items = generateItems(trial);
+    targetLoc = null;
+
+    items.forEach(item => {
+        if (item.isTarget) targetLoc = { x: item.x, y: item.y };
+        drawItem(item);
+    });
+
+    responded = false;
+    stimOnsetTime = performance.now();
+    document.getElementById('btnPresent').classList.remove('disabled');
+    document.getElementById('btnAbsent').classList.remove('disabled');
+}
+
+function generateItems(trial) {
+    const items = [];
+    const positions = [];
+    const margin = 30;
+    const minDist = 40;
+
+    function randomPos() {
+        for (let attempt = 0; attempt < 50; attempt++) {
+            const x = margin + Math.random() * (CW - margin * 2);
+            const y = margin + Math.random() * (CH - margin * 2);
+            let ok = true;
+            for (const p of positions) {
+                if (Math.sqrt((x - p.x) ** 2 + (y - p.y) ** 2) < minDist) { ok = false; break; }
+            }
+            if (ok) { positions.push({ x, y }); return { x, y }; }
+        }
+        const x = margin + Math.random() * (CW - margin * 2);
+        const y = margin + Math.random() * (CH - margin * 2);
+        positions.push({ x, y }); return { x, y };
+    }
+
+    // Target
+    if (trial.targetPresent) {
+        const pos = randomPos();
+        items.push({ ...pos, shape: 'circle', color: '#ef4444', isTarget: true });
+    }
+
+    // Distractors
+    const numDistractors = trial.setSize - (trial.targetPresent ? 1 : 0);
+    for (let i = 0; i < numDistractors; i++) {
+        const pos = randomPos();
+        if (trial.searchType === 'feature') {
+            items.push({ ...pos, shape: 'circle', color: '#3b82f6', isTarget: false });
+        } else {
+            // Conjunction: half red squares, half blue circles
+            if (i % 2 === 0) {
+                items.push({ ...pos, shape: 'square', color: '#ef4444', isTarget: false });
+            } else {
+                items.push({ ...pos, shape: 'circle', color: '#3b82f6', isTarget: false });
+            }
+        }
+    }
+    return items;
+}
+
+function drawItem(item) {
+    ctx.fillStyle = item.color;
+    if (item.shape === 'circle') {
+        ctx.beginPath(); ctx.arc(item.x, item.y, 14, 0, Math.PI * 2); ctx.fill();
+    } else {
+        ctx.fillRect(item.x - 12, item.y - 12, 24, 24);
+    }
+}
+
+function respond(saidPresent) {
+    if (responded) return;
+    responded = true;
+    const rt = performance.now() - stimOnsetTime;
+    const trial = trials[currentTrial];
+    const correct = saidPresent === trial.targetPresent;
+
+    trialData.push({
+        trial: currentTrial + 1,
+        practice: trial.practice,
+        searchType: trial.searchType,
+        setSize: trial.setSize,
+        targetPresent: trial.targetPresent,
+        response: saidPresent ? 'present' : 'absent',
+        correct: correct,
+        reactionTimeMs: Math.round(rt * 100) / 100,
+        targetLocation: targetLoc,
+        timestamp: Date.now()
+    });
+
+    // Feedback for practice
+    if (trial.practice) {
+        const fb = document.getElementById('feedback');
+        fb.textContent = correct ? 'Correct!' : 'Incorrect';
+        fb.style.color = correct ? '#4ade80' : '#f87171';
+    }
+
+    document.getElementById('btnPresent').classList.add('disabled');
+    document.getElementById('btnAbsent').classList.add('disabled');
+
+    currentTrial++;
+    setTimeout(showFixation, trial.practice ? 1200 : 500);
+}
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'y' || e.key === 'Y') respond(true);
+    if (e.key === 'n' || e.key === 'N') respond(false);
+});
+
+function endTask() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const main = trialData.filter(t => !t.practice);
+    const accuracy = main.filter(t => t.correct).length / main.length * 100;
+    const meanRT = main.reduce((s, t) => s + t.reactionTimeMs, 0) / main.length;
+
+    // Search slopes
+    function slope(type, present) {
+        const cond = main.filter(t => t.searchType === type && t.targetPresent === present && t.correct);
+        const bySize = {};
+        cond.forEach(t => { if (!bySize[t.setSize]) bySize[t.setSize] = []; bySize[t.setSize].push(t.reactionTimeMs); });
+        const points = Object.entries(bySize).map(([s, rts]) => ({ x: +s, y: rts.reduce((a, b) => a + b) / rts.length }));
+        if (points.length < 2) return 0;
+        const mx = points.reduce((s, p) => s + p.x, 0) / points.length;
+        const my = points.reduce((s, p) => s + p.y, 0) / points.length;
+        const num = points.reduce((s, p) => s + (p.x - mx) * (p.y - my), 0);
+        const den = points.reduce((s, p) => s + (p.x - mx) ** 2, 0);
+        return den > 0 ? num / den : 0;
+    }
+
+    const featureSlope = slope('feature', true);
+    const conjunctionSlope = slope('conjunction', true);
+
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-box"><div class="stat-label">Accuracy</div><div class="stat-value">${accuracy.toFixed(1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Mean RT</div><div class="stat-value">${(meanRT/1000).toFixed(2)}s</div></div>
+        <div class="stat-box"><div class="stat-label">Feature Slope</div><div class="stat-value">${featureSlope.toFixed(1)} ms/item</div></div>
+        <div class="stat-box"><div class="stat-label">Conjunction Slope</div><div class="stat-value">${conjunctionSlope.toFixed(1)} ms/item</div></div>
+    `;
+    localStorage.setItem('completed_visual-search.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'visual-search', completedAt: Date.now(), trials: trialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `visual-search_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['trial','practice','searchType','setSize','targetPresent','response','correct','reactionTimeMs'];
+    const rows = trialData.map(t => headers.map(h => t[h] ?? ''));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `visual-search_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,869 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cyberball - Online Ball-Tossing Game</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    background: #111113;
+    color: #d4d4d8;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+
+  .screen { display: none; width: 100%; max-width: 800px; padding: 24px; }
+  .screen.active { display: flex; flex-direction: column; align-items: center; }
+
+  h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    color: #fafafa;
+    margin-bottom: 16px;
+    text-align: center;
+  }
+
+  h2 {
+    font-size: 1.4rem;
+    font-weight: 600;
+    color: #fafafa;
+    margin-bottom: 12px;
+    text-align: center;
+  }
+
+  h3 {
+    font-weight: 600;
+    color: #fafafa;
+  }
+
+  p, li {
+    font-size: 1rem;
+    line-height: 1.65;
+    color: #d4d4d8;
+    max-width: 600px;
+  }
+
+  ul { list-style: none; padding-left: 0; margin: 12px 0; }
+  ul li::before { content: "\25b8 "; color: #a1a1aa; }
+
+  .btn {
+    background: #fafafa;
+    color: #111113;
+    border: none;
+    padding: 14px 40px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    border-radius: 8px;
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 24px;
+    transition: opacity 0.2s;
+  }
+  .btn:hover {
+    opacity: 0.88;
+  }
+
+  .btn-secondary {
+    background: #27272a;
+    color: #d4d4d8;
+    border: 1px solid #3f3f46;
+    border-radius: 8px;
+    padding: 14px 40px;
+    font-size: 1.1rem;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: opacity 0.2s;
+  }
+  .btn-secondary:hover {
+    opacity: 0.88;
+  }
+
+  .panel {
+    background: #18181b;
+    border: 1px solid #27272a;
+    border-radius: 12px;
+    padding: 24px;
+    width: 100%;
+    max-width: 640px;
+    margin: 12px 0;
+  }
+
+  /* Game canvas area */
+  #game-screen canvas {
+    border-radius: 12px;
+    border: 1px solid #27272a;
+    cursor: default;
+  }
+
+  .game-status {
+    font-size: 1.1rem;
+    color: #a1a1aa;
+    min-height: 28px;
+    text-align: center;
+    margin: 10px 0;
+  }
+
+  .game-info {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    max-width: 640px;
+    color: #71717a;
+    font-size: 0.85rem;
+    margin-bottom: 6px;
+  }
+
+  /* Self-report sliders */
+  .slider-group { margin: 16px 0; width: 100%; }
+  .slider-group label {
+    display: block;
+    font-size: 0.95rem;
+    color: #d4d4d8;
+    margin-bottom: 6px;
+  }
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .slider-row span {
+    font-size: 0.8rem;
+    color: #71717a;
+    min-width: 24px;
+    text-align: center;
+  }
+  .slider-row .val {
+    color: #fafafa;
+    font-weight: 700;
+    font-size: 1.1rem;
+    min-width: 30px;
+  }
+  input[type="range"] {
+    -webkit-appearance: none;
+    appearance: none;
+    flex: 1;
+    height: 6px;
+    border-radius: 3px;
+    background: #27272a;
+    border: none;
+    outline: none;
+  }
+  input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fafafa;
+    cursor: pointer;
+  }
+  input[type="range"]::-moz-range-thumb {
+    width: 20px; height: 20px;
+    border-radius: 50%;
+    background: #fafafa;
+    cursor: pointer;
+    border: none;
+  }
+
+  .end-summary {
+    text-align: center;
+    margin: 16px 0;
+  }
+  .end-summary .stat {
+    color: #fafafa;
+    font-weight: 700;
+  }
+
+  .connecting-dots {
+    display: inline-block;
+  }
+  .connecting-dots::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+  }
+  @keyframes dots {
+    0% { content: ''; }
+    25% { content: '.'; }
+    50% { content: '..'; }
+    75% { content: '...'; }
+    100% { content: ''; }
+  }
+</style>
+</head>
+<body>
+
+<!-- SCREEN: Cover Story -->
+<div id="cover-screen" class="screen active">
+  <h1>Online Ball-Tossing Game</h1>
+  <div class="panel">
+    <p>Welcome! In this study, you will play an online ball-tossing game called <strong>Cyberball</strong> with two other participants who are also doing this study right now.</p>
+    <br>
+    <p>The purpose of this task is to study mental visualization during a simple online game. We want you to imagine the experience as vividly as possible — picture yourself tossing and catching the ball in real time.</p>
+    <br>
+    <p>You will play <strong>three short games</strong> (about 1-2 minutes each). Between games, we will ask you a few brief questions about your experience.</p>
+  </div>
+  <button class="btn" onclick="showScreen('instructions-screen')">Continue</button>
+</div>
+
+<!-- SCREEN: Instructions -->
+<div id="instructions-screen" class="screen">
+  <h1>How to Play</h1>
+  <div class="panel">
+    <ul>
+      <li>You and two other players will toss a ball back and forth.</li>
+      <li>When you receive the ball, <strong>click on the player</strong> you want to throw it to.</li>
+      <li>When another player has the ball, just wait for them to decide.</li>
+      <li>There are no right or wrong choices — just play naturally.</li>
+    </ul>
+    <br>
+    <p style="color:#71717a; font-size:0.9rem;">The game will begin once all players are connected. Please wait a moment after clicking "Ready".</p>
+  </div>
+  <button class="btn" onclick="startConnecting()">I'm Ready</button>
+</div>
+
+<!-- SCREEN: Connecting -->
+<div id="connecting-screen" class="screen">
+  <h1>Connecting<span class="connecting-dots"></span></h1>
+  <div class="panel" style="text-align:center;">
+    <p id="connect-status">Searching for other participants...</p>
+  </div>
+</div>
+
+<!-- SCREEN: Game -->
+<div id="game-screen" class="screen">
+  <div class="game-info">
+    <span id="game-label">Game 1 of 3</span>
+    <span id="throw-label">Throw 0 / 30</span>
+  </div>
+  <canvas id="gameCanvas" width="640" height="480"></canvas>
+  <div class="game-status" id="game-status">&nbsp;</div>
+</div>
+
+<!-- SCREEN: Self-Report -->
+<div id="report-screen" class="screen">
+  <h2 id="report-title">How did you feel during that game?</h2>
+  <div class="panel">
+    <div class="slider-group">
+      <label>How <strong>positive or negative</strong> is your mood right now?</label>
+      <div class="slider-row">
+        <span>Very negative</span>
+        <input type="range" id="slider-mood" min="1" max="10" value="5" oninput="document.getElementById('val-mood').textContent=this.value">
+        <span>Very positive</span>
+        <span class="val" id="val-mood">5</span>
+      </div>
+    </div>
+    <div class="slider-group">
+      <label>How much did you feel you <strong>belonged</strong> to the group?</label>
+      <div class="slider-row">
+        <span>Not at all</span>
+        <input type="range" id="slider-belonging" min="1" max="10" value="5" oninput="document.getElementById('val-belonging').textContent=this.value">
+        <span>Very much</span>
+        <span class="val" id="val-belonging">5</span>
+      </div>
+    </div>
+    <div class="slider-group">
+      <label>How much <strong>control</strong> did you feel you had over the game?</label>
+      <div class="slider-row">
+        <span>None</span>
+        <input type="range" id="slider-control" min="1" max="10" value="5" oninput="document.getElementById('val-control').textContent=this.value">
+        <span>Complete</span>
+        <span class="val" id="val-control">5</span>
+      </div>
+    </div>
+    <div class="slider-group">
+      <label>How high is your <strong>self-esteem</strong> right now?</label>
+      <div class="slider-row">
+        <span>Very low</span>
+        <input type="range" id="slider-esteem" min="1" max="10" value="5" oninput="document.getElementById('val-esteem').textContent=this.value">
+        <span>Very high</span>
+        <span class="val" id="val-esteem">5</span>
+      </div>
+    </div>
+  </div>
+  <button class="btn" onclick="submitReport()">Continue</button>
+</div>
+
+<!-- SCREEN: End -->
+<div id="end-screen" class="screen">
+  <h1>Thank You!</h1>
+  <div class="panel end-summary">
+    <p>You have completed all three games. Thank you for your participation.</p>
+    <br>
+    <p>Your data has been recorded. Click below to download your results.</p>
+  </div>
+  <button class="btn" onclick="downloadData()">Download Data (JSON)</button>
+  <button class="btn-secondary" onclick="downloadCSV()">Download Data (CSV)</button>
+</div>
+
+<script>
+// ===================== STATE =====================
+const TOTAL_THROWS = 30;
+const FAIR_PERIOD = 5; // throws before exclusion kicks in
+
+const participantId = 'P' + Date.now().toString(36).toUpperCase();
+const sessionStart = new Date().toISOString();
+
+// Condition order: counterbalanced pseudo-randomly
+const CONDITIONS = ['inclusion', 'exclusion', 'overinclusion'];
+function shuffleConditions() {
+  const orders = [
+    [0,1,2],[0,2,1],[1,0,2],[1,2,0],[2,0,1],[2,1,0]
+  ];
+  return orders[Math.floor(Math.random() * orders.length)].map(i => CONDITIONS[i]);
+}
+const conditionOrder = shuffleConditions();
+
+let currentGame = 0; // 0-indexed
+let throwIndex = 0;
+let ballHolder = -1; // 0=participant, 1=player2, 2=player3
+let gameActive = false;
+let participantHasBall = false;
+let throwStartTime = 0;
+let lastParticipantReceiveTime = 0;
+
+// Player info
+const players = [
+  { name: 'You', color: '#d4d4d8', x: 320, y: 390 },
+  { name: 'Alex', color: '#71717a', x: 120, y: 120 },
+  { name: 'Jordan', color: '#71717a', x: 520, y: 120 }
+];
+
+// Data collection
+const allData = {
+  participantId,
+  sessionStart,
+  conditionOrder: [...conditionOrder],
+  games: [],
+  reports: []
+};
+
+let currentGameData = null;
+
+// Animation state
+let ball = { x: 320, y: 300, visible: false };
+let animating = false;
+let animStart = 0;
+let animDuration = 500; // ms
+let animFrom = { x: 0, y: 0 };
+let animTo = { x: 0, y: 0 };
+let animCallback = null;
+
+// Canvas
+let canvas, ctx;
+let hoverPlayer = -1;
+
+// ===================== SCREEN MANAGEMENT =====================
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+// ===================== CONNECTING SIMULATION =====================
+function startConnecting() {
+  showScreen('connecting-screen');
+  const statusEl = document.getElementById('connect-status');
+  setTimeout(() => { statusEl.textContent = 'Found participant: Alex'; }, 1200);
+  setTimeout(() => { statusEl.textContent = 'Found participant: Jordan'; }, 2800);
+  setTimeout(() => { statusEl.textContent = 'All players connected! Starting game...'; }, 4200);
+  setTimeout(() => { beginGame(); }, 5400);
+}
+
+// ===================== GAME LOGIC =====================
+function beginGame() {
+  showScreen('game-screen');
+  canvas = document.getElementById('gameCanvas');
+  ctx = canvas.getContext('2d');
+
+  throwIndex = 0;
+  currentGameData = {
+    condition: conditionOrder[currentGame],
+    gameNumber: currentGame + 1,
+    throws: [],
+    startTime: Date.now()
+  };
+
+  document.getElementById('game-label').textContent = `Game ${currentGame + 1} of 3`;
+  document.getElementById('throw-label').textContent = `Throw 0 / ${TOTAL_THROWS}`;
+  document.getElementById('game-status').innerHTML = '&nbsp;';
+
+  gameActive = true;
+  participantHasBall = false;
+
+  // Register canvas events
+  canvas.onmousemove = onCanvasMouseMove;
+  canvas.onclick = onCanvasClick;
+
+  // Start: random player gets ball first
+  ballHolder = Math.floor(Math.random() * 3);
+  ball.x = players[ballHolder].x;
+  ball.y = players[ballHolder].y - 30;
+  ball.visible = true;
+  lastParticipantReceiveTime = Date.now();
+
+  drawGame();
+
+  if (ballHolder === 0) {
+    onParticipantTurn();
+  } else {
+    onComputerTurn();
+  }
+}
+
+function onParticipantTurn() {
+  participantHasBall = true;
+  throwStartTime = Date.now();
+  document.getElementById('game-status').textContent = 'You have the ball! Click on a player to throw to them.';
+  drawGame();
+}
+
+function onComputerTurn() {
+  participantHasBall = false;
+  const holder = ballHolder;
+  const holderName = players[holder].name;
+  document.getElementById('game-status').textContent = `${holderName} is deciding...`;
+  drawGame();
+
+  const delay = 1000 + Math.random() * 2000;
+  setTimeout(() => {
+    if (!gameActive) return;
+    const target = computerChooseTarget(holder);
+    executeThrow(holder, target, null);
+  }, delay);
+}
+
+function computerChooseTarget(holder) {
+  const condition = conditionOrder[currentGame];
+  const other = holder === 1 ? 2 : 1; // the other computer player
+  const participant = 0;
+
+  if (condition === 'inclusion') {
+    // Fair: ~50% to participant, ~50% to other computer (each gets ~33% overall)
+    return Math.random() < 0.5 ? participant : other;
+  }
+
+  if (condition === 'exclusion') {
+    if (throwIndex < FAIR_PERIOD) {
+      // Fair at first
+      return Math.random() < 0.5 ? participant : other;
+    }
+    // Gradual exclusion: probability of throwing to participant decreases
+    const progress = (throwIndex - FAIR_PERIOD) / (TOTAL_THROWS - FAIR_PERIOD);
+    const probParticipant = Math.max(0, 0.4 - progress * 0.5);
+    return Math.random() < probParticipant ? participant : other;
+  }
+
+  if (condition === 'overinclusion') {
+    // Over-include: 60-70% to participant
+    return Math.random() < 0.65 ? participant : other;
+  }
+
+  return other;
+}
+
+function executeThrow(from, to, rt) {
+  if (!gameActive) return;
+
+  const throwData = {
+    throwNumber: throwIndex + 1,
+    from: players[from].name,
+    fromIndex: from,
+    to: players[to].name,
+    toIndex: to,
+    isParticipantThrow: from === 0,
+    participantChoice: from === 0 ? players[to].name : null,
+    reactionTime: rt,
+    timeSinceLastReceive: from === 0 ? null : (to === 0 ? Date.now() - lastParticipantReceiveTime : null),
+    timestamp: Date.now()
+  };
+  currentGameData.throws.push(throwData);
+
+  throwIndex++;
+  document.getElementById('throw-label').textContent = `Throw ${throwIndex} / ${TOTAL_THROWS}`;
+
+  // Animate ball
+  animateBall(players[from].x, players[from].y - 30, players[to].x, players[to].y - 30, () => {
+    ballHolder = to;
+    ball.x = players[to].x;
+    ball.y = players[to].y - 30;
+
+    if (throwIndex >= TOTAL_THROWS) {
+      endCurrentGame();
+      return;
+    }
+
+    if (to === 0) {
+      lastParticipantReceiveTime = Date.now();
+      onParticipantTurn();
+    } else {
+      onComputerTurn();
+    }
+  });
+}
+
+function endCurrentGame() {
+  gameActive = false;
+  participantHasBall = false;
+  ball.visible = false;
+  canvas.onmousemove = null;
+  canvas.onclick = null;
+
+  currentGameData.endTime = Date.now();
+  currentGameData.duration = currentGameData.endTime - currentGameData.startTime;
+
+  // Compute summary stats
+  const pThrows = currentGameData.throws.filter(t => t.isParticipantThrow);
+  const toAlex = pThrows.filter(t => t.toIndex === 1).length;
+  const toJordan = pThrows.filter(t => t.toIndex === 2).length;
+  const totalP = pThrows.length;
+  const timesReceived = currentGameData.throws.filter(t => t.toIndex === 0).length;
+
+  currentGameData.summary = {
+    participantThrowsTotal: totalP,
+    participantThrowsToAlex: toAlex,
+    participantThrowsToJordan: toJordan,
+    participantThrowDistribution: {
+      alex: totalP > 0 ? (toAlex / totalP * 100).toFixed(1) + '%' : '0%',
+      jordan: totalP > 0 ? (toJordan / totalP * 100).toFixed(1) + '%' : '0%'
+    },
+    timesParticipantReceivedBall: timesReceived,
+    receivePercentage: (timesReceived / TOTAL_THROWS * 100).toFixed(1) + '%',
+    meanReactionTime: pThrows.length > 0 ?
+      Math.round(pThrows.reduce((s, t) => s + (t.reactionTime || 0), 0) / pThrows.length) : null
+  };
+
+  allData.games.push(currentGameData);
+
+  document.getElementById('game-status').textContent = 'Game complete!';
+  drawGame();
+
+  setTimeout(() => {
+    showSelfReport();
+  }, 1500);
+}
+
+// ===================== SELF REPORT =====================
+function showSelfReport() {
+  showScreen('report-screen');
+  document.getElementById('report-title').textContent =
+    `How did you feel during Game ${currentGame + 1}?`;
+
+  // Reset sliders
+  ['mood', 'belonging', 'control', 'esteem'].forEach(id => {
+    document.getElementById('slider-' + id).value = 5;
+    document.getElementById('val-' + id).textContent = '5';
+  });
+}
+
+function submitReport() {
+  const report = {
+    gameNumber: currentGame + 1,
+    condition: conditionOrder[currentGame],
+    mood: parseInt(document.getElementById('slider-mood').value),
+    belonging: parseInt(document.getElementById('slider-belonging').value),
+    control: parseInt(document.getElementById('slider-control').value),
+    selfEsteem: parseInt(document.getElementById('slider-esteem').value),
+    timestamp: Date.now()
+  };
+  allData.reports.push(report);
+
+  currentGame++;
+  if (currentGame < 3) {
+    // Brief "reconnecting" then next game
+    showScreen('connecting-screen');
+    const statusEl = document.getElementById('connect-status');
+    statusEl.textContent = 'Reconnecting to players for next game...';
+    setTimeout(() => {
+      statusEl.textContent = 'All players ready. Starting next game...';
+    }, 1500);
+    setTimeout(() => {
+      beginGame();
+    }, 2800);
+  } else {
+    allData.sessionEnd = new Date().toISOString();
+    showScreen('end-screen');
+  }
+}
+
+// ===================== CANVAS EVENTS =====================
+function onCanvasMouseMove(e) {
+  const rect = canvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (canvas.width / rect.width);
+  const my = (e.clientY - rect.top) * (canvas.height / rect.height);
+
+  hoverPlayer = -1;
+  if (participantHasBall && !animating) {
+    for (let i = 1; i <= 2; i++) {
+      const dx = mx - players[i].x;
+      const dy = my - (players[i].y - 10);
+      if (Math.sqrt(dx * dx + dy * dy) < 50) {
+        hoverPlayer = i;
+        break;
+      }
+    }
+  }
+  canvas.style.cursor = hoverPlayer >= 0 ? 'pointer' : 'default';
+  drawGame();
+}
+
+function onCanvasClick(e) {
+  if (!participantHasBall || animating || !gameActive) return;
+  if (hoverPlayer < 0) return;
+
+  const rt = Date.now() - throwStartTime;
+  participantHasBall = false;
+  document.getElementById('game-status').innerHTML = '&nbsp;';
+  executeThrow(0, hoverPlayer, rt);
+}
+
+// ===================== ANIMATION =====================
+function animateBall(fx, fy, tx, ty, cb) {
+  animating = true;
+  animFrom = { x: fx, y: fy };
+  animTo = { x: tx, y: ty };
+  animStart = performance.now();
+  animDuration = 450;
+  animCallback = cb;
+  requestAnimationFrame(animStep);
+}
+
+function animStep(ts) {
+  const t = Math.min((ts - animStart) / animDuration, 1);
+  const ease = t < 0.5 ? 2 * t * t : -1 + (4 - 2 * t) * t; // ease in-out quad
+
+  ball.x = animFrom.x + (animTo.x - animFrom.x) * ease;
+  // Parabolic arc: peak at midpoint
+  const linearY = animFrom.y + (animTo.y - animFrom.y) * ease;
+  const arcHeight = -80 * Math.sin(Math.PI * t);
+  ball.y = linearY + arcHeight;
+  ball.visible = true;
+
+  drawGame();
+
+  if (t < 1) {
+    requestAnimationFrame(animStep);
+  } else {
+    animating = false;
+    ball.x = animTo.x;
+    ball.y = animTo.y;
+    drawGame();
+    if (animCallback) animCallback();
+  }
+}
+
+// ===================== DRAWING =====================
+function drawGame() {
+  if (!ctx) return;
+  const W = canvas.width;
+  const H = canvas.height;
+
+  // Background
+  ctx.fillStyle = '#111113';
+  ctx.fillRect(0, 0, W, H);
+
+  // Subtle grid
+  ctx.strokeStyle = 'rgba(39,39,42,0.4)';
+  ctx.lineWidth = 1;
+  for (let x = 0; x < W; x += 40) {
+    ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke();
+  }
+  for (let y = 0; y < H; y += 40) {
+    ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke();
+  }
+
+  // Connection lines (faint)
+  ctx.strokeStyle = 'rgba(113,113,122,0.15)';
+  ctx.lineWidth = 2;
+  for (let i = 0; i < 3; i++) {
+    for (let j = i + 1; j < 3; j++) {
+      ctx.beginPath();
+      ctx.moveTo(players[i].x, players[i].y - 10);
+      ctx.lineTo(players[j].x, players[j].y - 10);
+      ctx.stroke();
+    }
+  }
+
+  // Draw players
+  for (let i = 0; i < 3; i++) {
+    drawPlayer(i);
+  }
+
+  // Draw ball
+  if (ball.visible) {
+    ctx.beginPath();
+    ctx.arc(ball.x, ball.y, 12, 0, Math.PI * 2);
+    ctx.fillStyle = '#d4d4d8';
+    ctx.fill();
+    ctx.strokeStyle = '#a1a1aa';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+
+    // Ball highlight
+    ctx.beginPath();
+    ctx.arc(ball.x - 3, ball.y - 3, 4, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(255,255,255,0.35)';
+    ctx.fill();
+  }
+}
+
+function drawPlayer(i) {
+  const p = players[i];
+  const isHover = hoverPlayer === i;
+  const hasBall = ballHolder === i && !animating;
+  const isParticipant = i === 0;
+
+  const activeColor = isParticipant ? '#d4d4d8' : '#71717a';
+  const drawColor = (hasBall || isHover) ? '#d4d4d8' : activeColor;
+
+  // Highlight ring if hovered or has ball
+  if (isHover || hasBall) {
+    ctx.beginPath();
+    ctx.arc(p.x, p.y - 10, 48, 0, Math.PI * 2);
+    ctx.strokeStyle = isHover ? 'rgba(212,212,216,0.4)' : 'rgba(161,161,170,0.25)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  // "Platform" circle
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 10, 36, 0, Math.PI * 2);
+  ctx.fillStyle = isParticipant ? 'rgba(212,212,216,0.06)' : 'rgba(113,113,122,0.04)';
+  ctx.fill();
+  ctx.strokeStyle = drawColor;
+  ctx.lineWidth = 2;
+  ctx.globalAlpha = 0.5;
+  ctx.stroke();
+  ctx.globalAlpha = 1;
+
+  // Head
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 35, 14, 0, Math.PI * 2);
+  ctx.fillStyle = drawColor;
+  ctx.globalAlpha = 0.9;
+  ctx.fill();
+
+  // Simple face
+  ctx.fillStyle = '#111113';
+  ctx.globalAlpha = 0.8;
+  // Eyes
+  ctx.beginPath();
+  ctx.arc(p.x - 5, p.y - 37, 2, 0, Math.PI * 2);
+  ctx.arc(p.x + 5, p.y - 37, 2, 0, Math.PI * 2);
+  ctx.fill();
+  // Mouth
+  ctx.beginPath();
+  ctx.arc(p.x, p.y - 30, 4, 0.1 * Math.PI, 0.9 * Math.PI);
+  ctx.strokeStyle = '#111113';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.globalAlpha = 1;
+
+  // Body line
+  ctx.beginPath();
+  ctx.moveTo(p.x, p.y - 21);
+  ctx.lineTo(p.x, p.y + 5);
+  ctx.strokeStyle = drawColor;
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Arms
+  ctx.beginPath();
+  ctx.moveTo(p.x - 18, p.y - 10);
+  ctx.lineTo(p.x, p.y - 16);
+  ctx.lineTo(p.x + 18, p.y - 10);
+  ctx.strokeStyle = drawColor;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Legs
+  ctx.beginPath();
+  ctx.moveTo(p.x - 12, p.y + 20);
+  ctx.lineTo(p.x, p.y + 5);
+  ctx.lineTo(p.x + 12, p.y + 20);
+  ctx.strokeStyle = drawColor;
+  ctx.lineWidth = 2.5;
+  ctx.stroke();
+
+  // Name label
+  ctx.font = '600 14px "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#a1a1aa';
+  ctx.fillText(p.name, p.x, p.y + 38);
+
+  // "Click to throw" hint
+  if (isHover && participantHasBall && !animating) {
+    ctx.font = '12px "Inter", -apple-system, BlinkMacSystemFont, system-ui, sans-serif';
+    ctx.fillStyle = '#a1a1aa';
+    ctx.fillText('Click to throw!', p.x, p.y + 54);
+  }
+}
+
+// ===================== DATA EXPORT =====================
+function downloadData() {
+  const json = JSON.stringify(allData, null, 2);
+  const blob = new Blob([json], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cyberball_${participantId}_${Date.now()}.json`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function downloadCSV() {
+  const rows = [
+    ['participantId', 'sessionStart', 'gameNumber', 'condition',
+     'throwNumber', 'from', 'fromIndex', 'to', 'toIndex',
+     'isParticipantThrow', 'participantChoice', 'reactionTime',
+     'timeSinceLastReceive', 'timestamp',
+     'postGame_mood', 'postGame_belonging', 'postGame_control', 'postGame_selfEsteem']
+  ];
+
+  allData.games.forEach((game, gi) => {
+    const report = allData.reports[gi] || {};
+    game.throws.forEach(t => {
+      rows.push([
+        allData.participantId,
+        allData.sessionStart,
+        game.gameNumber,
+        game.condition,
+        t.throwNumber,
+        t.from,
+        t.fromIndex,
+        t.to,
+        t.toIndex,
+        t.isParticipantThrow,
+        t.participantChoice || '',
+        t.reactionTime || '',
+        t.timeSinceLastReceive || '',
+        t.timestamp,
+        report.mood || '',
+        report.belonging || '',
+        report.control || '',
+        report.selfEsteem || ''
+      ]);
+    });
+  });
+
+  const csv = rows.map(r => r.map(v => `"${v}"`).join(',')).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `cyberball_${participantId}_${Date.now()}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sequence Prediction Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #d4d4d8; min-height: 100vh; display: flex; justify-content: center; align-items: center; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 550px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; border-radius: 8px; font-family: inherit; padding: 14px 36px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: background 0.15s, transform 0.15s; margin-top: 12px; }
+        .btn:hover { background: #e4e4e7; transform: scale(1.04); }
+
+        .game-area { display: flex; flex-direction: column; align-items: center; gap: 24px; max-width: 700px; width: 100%; }
+
+        .sequence-display {
+            display: flex; gap: 8px; flex-wrap: wrap; justify-content: center;
+            min-height: 60px; padding: 16px; background: #18181b; border-radius: 8px;
+            border: 1px solid #27272a; width: 100%;
+        }
+        .seq-item {
+            width: 48px; height: 48px; border-radius: 10px; display: flex; align-items: center;
+            justify-content: center; font-size: 1.3rem; font-weight: 700;
+            background: #27272a; border: 1px solid #3f3f46; color: #d4d4d8;
+            transition: all 0.3s;
+        }
+        .seq-item.revealed { background: #3f3f46; }
+        .seq-item.correct { background: #1a2e1a; border-color: #4ade80; color: #4ade80; }
+        .seq-item.incorrect { background: #2e1a1a; border-color: #ef4444; color: #ef4444; }
+        .seq-item.question {
+            background: #27272a;
+            border: 1px dashed #52525b; color: #71717a; font-size: 1.5rem;
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse { 0%, 100% { opacity: 0.85; } 50% { opacity: 1; } }
+
+        .choices { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+        .choice-btn {
+            width: 64px; height: 64px; border-radius: 12px; border: 1px solid #27272a;
+            background: #18181b; color: #d4d4d8; font-size: 1.4rem; font-weight: 700;
+            font-family: inherit; cursor: pointer; transition: all 0.2s;
+        }
+        .choice-btn:hover { border-color: #3f3f46; background: #27272a; transform: scale(1.08); }
+        .choice-btn.disabled { opacity: 0.3; pointer-events: none; }
+
+        .level-info { display: flex; gap: 20px; color: #52525b; font-size: 0.85rem; }
+        .feedback-area { font-size: 1rem; min-height: 30px; text-align: center; }
+        .streak { color: #a1a1aa; font-size: 0.9rem; }
+
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 400px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
+        .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.2rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Sequence Prediction</h1>
+    <p>You will see a sequence of symbols that follows a hidden rule. Your task is to <strong>predict what comes next</strong>.</p>
+    <p>After each prediction, the correct answer is revealed. Try to discover the pattern as quickly as possible!</p>
+    <p>Rules start simple and get harder. You'll see 2 practice sequences, then the main task.</p>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<div class="screen" id="gameScreen">
+    <div class="game-area">
+        <div class="level-info">
+            <span id="seqInfo"></span>
+            <span id="predInfo"></span>
+        </div>
+        <div class="sequence-display" id="seqDisplay"></div>
+        <div class="feedback-area" id="feedbackArea"></div>
+        <div class="choices" id="choices"></div>
+        <div class="streak" id="streakDisplay"></div>
+    </div>
+</div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="background:#e4e4e7;margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+// Rule definitions
+const rules = [
+    // Level 1 - Simple
+    { name: 'repeat-AB', level: 1, symbols: ['A','B'], generate: (i) => ['A','B'][i % 2], practice: true },
+    { name: 'increment', level: 1, symbols: ['1','2','3','4','5','6','7','8','9'], generate: (i) => String((i % 9) + 1), practice: true },
+    { name: 'repeat-ABC', level: 1, symbols: ['A','B','C'], generate: (i) => ['A','B','C'][i % 3] },
+    { name: 'count-up', level: 1, symbols: ['1','2','3','4','5'], generate: (i) => String((i % 5) + 1) },
+
+    // Level 2 - Skip/Double
+    { name: 'skip-odd', level: 2, symbols: ['1','3','5','7','9'], generate: (i) => String(((i * 2) % 10) + 1) },
+    { name: 'double-repeat', level: 2, symbols: ['A','B','C'], generate: (i) => ['A','A','B','B','C','C'][i % 6] },
+    { name: 'reverse-cycle', level: 2, symbols: ['1','2','3','4'], generate: (i) => ['1','2','3','4','3','2'][i % 6] },
+
+    // Level 3 - Complex
+    { name: 'fibonacci-mod', level: 3, symbols: ['1','2','3','4','5'], generate: (i, seq) => {
+        if (i < 2) return String(i + 1);
+        return String(((parseInt(seq[i-1]) + parseInt(seq[i-2]) - 1) % 5) + 1);
+    }},
+    { name: 'xor-pattern', level: 3, symbols: ['0','1'], generate: (i, seq) => {
+        if (i < 2) return ['1','0'][i];
+        return String(parseInt(seq[i-1]) ^ parseInt(seq[i-2]));
+    }},
+    { name: 'growing-run', level: 3, symbols: ['A','B','C'], generate: (i) => {
+        // A, B, B, C, C, C, A, B, B, C, C, C...
+        const cycle = [0, 1, 1, 2, 2, 2];
+        return ['A','B','C'][cycle[i % 6]];
+    }},
+
+    // Level 4 - Nested/Conditional
+    { name: 'nested-inc', level: 4, symbols: ['A','B','C','D','1','2','3','4'], generate: (i) => {
+        // A1, A2, B1, B2, C1, C2, D1, D2
+        const letters = ['A','B','C','D'];
+        const nums = ['1','2'];
+        return i % 2 === 0 ? letters[Math.floor(i / 2) % 4] : nums[(Math.floor(i / 2) % 2)];
+    }},
+    { name: 'conditional', level: 4, symbols: ['X','Y','1','2'], generate: (i) => {
+        // X,1,Y,2,X,1,Y,2...
+        return ['X','1','Y','2'][i % 4];
+    }},
+];
+
+const PREDICTIONS_PER_SEQ = 10;
+const INITIAL_SHOWN = 3;
+
+let currentRuleIdx = 0;
+let predictionIdx = 0;
+let fullSequence = [];
+let shownCount = 0;
+let trialData = [];
+let seqTrials = [];
+let consecutiveCorrect = 0;
+let stimOnsetTime = 0;
+
+function generateFullSequence(rule) {
+    const seq = [];
+    for (let i = 0; i < INITIAL_SHOWN + PREDICTIONS_PER_SEQ; i++) {
+        seq.push(rule.generate(i, seq));
+    }
+    return seq;
+}
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('gameScreen').classList.add('active');
+    startSequence();
+}
+
+function startSequence() {
+    if (currentRuleIdx >= rules.length) return endTask();
+    const rule = rules[currentRuleIdx];
+    fullSequence = generateFullSequence(rule);
+    shownCount = INITIAL_SHOWN;
+    predictionIdx = 0;
+    seqTrials = [];
+    consecutiveCorrect = 0;
+
+    document.getElementById('seqInfo').textContent = rule.practice
+        ? `Practice: ${rule.name}`
+        : `Sequence ${currentRuleIdx - 1}/${rules.length - 2} · Level ${rule.level}`;
+
+    renderSequence();
+    showPrediction();
+}
+
+function renderSequence() {
+    const display = document.getElementById('seqDisplay');
+    display.innerHTML = '';
+
+    for (let i = 0; i < shownCount; i++) {
+        const el = document.createElement('div');
+        el.className = 'seq-item revealed';
+        el.textContent = fullSequence[i];
+        display.appendChild(el);
+    }
+
+    // Question mark for next
+    const q = document.createElement('div');
+    q.className = 'seq-item question';
+    q.textContent = '?';
+    q.id = 'questionMark';
+    display.appendChild(q);
+}
+
+function showPrediction() {
+    const rule = rules[currentRuleIdx];
+    document.getElementById('predInfo').textContent = `Prediction ${predictionIdx + 1}/${PREDICTIONS_PER_SEQ}`;
+    document.getElementById('feedbackArea').textContent = '';
+
+    // Get unique symbols for choices (include correct + distractors)
+    const correct = fullSequence[shownCount];
+    let choices = [...new Set(rule.symbols)];
+    if (!choices.includes(correct)) choices.push(correct);
+    // Shuffle
+    for (let i = choices.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [choices[i], choices[j]] = [choices[j], choices[i]];
+    }
+
+    const container = document.getElementById('choices');
+    container.innerHTML = '';
+    choices.forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.textContent = c;
+        btn.onclick = () => makeChoice(c);
+        container.appendChild(btn);
+    });
+
+    document.getElementById('streakDisplay').textContent = consecutiveCorrect > 1 ? `Streak: ${consecutiveCorrect}` : '';
+    stimOnsetTime = performance.now();
+}
+
+function makeChoice(choice) {
+    const rt = performance.now() - stimOnsetTime;
+    const correct = fullSequence[shownCount];
+    const isCorrect = choice === correct;
+
+    if (isCorrect) consecutiveCorrect++;
+    else consecutiveCorrect = 0;
+
+    const trial = {
+        sequence: currentRuleIdx + 1,
+        ruleName: rules[currentRuleIdx].name,
+        ruleLevel: rules[currentRuleIdx].level,
+        practice: !!rules[currentRuleIdx].practice,
+        predictionNum: predictionIdx + 1,
+        sequenceShown: fullSequence.slice(0, shownCount),
+        correctAnswer: correct,
+        response: choice,
+        correct: isCorrect,
+        consecutiveCorrect: consecutiveCorrect,
+        reactionTimeMs: Math.round(rt * 100) / 100,
+        timestamp: Date.now()
+    };
+    seqTrials.push(trial);
+    trialData.push(trial);
+
+    // Show feedback
+    const fb = document.getElementById('feedbackArea');
+    fb.textContent = isCorrect ? 'Correct!' : `Incorrect — it was ${correct}`;
+    fb.style.color = isCorrect ? '#4ade80' : '#f87171';
+
+    // Update question mark
+    const q = document.getElementById('questionMark');
+    q.textContent = correct;
+    q.className = `seq-item ${isCorrect ? 'correct' : 'incorrect'}`;
+
+    // Disable choices
+    document.querySelectorAll('.choice-btn').forEach(b => b.classList.add('disabled'));
+
+    shownCount++;
+    predictionIdx++;
+
+    setTimeout(() => {
+        if (predictionIdx >= PREDICTIONS_PER_SEQ) {
+            currentRuleIdx++;
+            setTimeout(startSequence, 800);
+        } else {
+            renderSequence();
+            showPrediction();
+        }
+    }, 1000);
+}
+
+function endTask() {
+    document.getElementById('gameScreen').classList.remove('active');
+    document.getElementById('endScreen').classList.add('active');
+
+    const main = trialData.filter(t => !t.practice);
+    const accuracy = main.filter(t => t.correct).length / main.length * 100;
+
+    // Learning speed: avg predictions before first correct per sequence
+    const bySeq = {};
+    main.forEach(t => {
+        if (!bySeq[t.sequence]) bySeq[t.sequence] = [];
+        bySeq[t.sequence].push(t);
+    });
+    let totalFirstCorrect = 0, seqCount = 0;
+    Object.values(bySeq).forEach(trials => {
+        const first = trials.findIndex(t => t.correct);
+        totalFirstCorrect += first >= 0 ? first + 1 : trials.length;
+        seqCount++;
+    });
+    const avgLearning = totalFirstCorrect / seqCount;
+
+    // By level
+    const byLevel = {};
+    main.forEach(t => {
+        if (!byLevel[t.ruleLevel]) byLevel[t.ruleLevel] = [];
+        byLevel[t.ruleLevel].push(t);
+    });
+
+    let html = `
+        <div class="stat-box"><div class="stat-label">Overall Accuracy</div><div class="stat-value">${accuracy.toFixed(1)}%</div></div>
+        <div class="stat-box"><div class="stat-label">Avg Learning Speed</div><div class="stat-value">${avgLearning.toFixed(1)} trials</div></div>
+    `;
+    for (const level of [1, 2, 3, 4]) {
+        const lvl = byLevel[level] || [];
+        const acc = lvl.length > 0 ? lvl.filter(t => t.correct).length / lvl.length * 100 : 0;
+        html += `<div class="stat-box"><div class="stat-label">Level ${level} Acc</div><div class="stat-value">${acc.toFixed(1)}%</div></div>`;
+    }
+    document.getElementById('statsGrid').innerHTML = html;
+    localStorage.setItem('completed_sequence-prediction.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'sequence-prediction', completedAt: Date.now(), trials: trialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `sequence_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['sequence','ruleName','ruleLevel','practice','predictionNum','correctAnswer','response','correct','consecutiveCorrect','reactionTimeMs'];
+    const rows = trialData.map(t => headers.map(h => t[h] ?? ''));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `sequence_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>

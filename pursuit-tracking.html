@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pursuit Tracking Task</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif; -webkit-font-smoothing: antialiased; background: #111113; color: #e0e0f0; min-height: 100vh; display: flex; justify-content: center; align-items: center; overflow: hidden; cursor: none; }
+        .screen { display: none; width: 100vw; height: 100vh; flex-direction: column; align-items: center; justify-content: center; padding: 24px; }
+        .screen.active { display: flex; cursor: default; }
+        h1 { font-size: 2rem; color: #fafafa; margin-bottom: 20px; }
+        p { color: #a1a1aa; line-height: 1.7; margin-bottom: 12px; max-width: 550px; text-align: center; }
+        .btn { background: #fafafa; color: #111113; border: none; font-family: inherit; border-radius: 12px; padding: 14px 36px; font-size: 1rem; font-weight: 700; cursor: pointer; transition: transform 0.15s, background 0.15s; margin-top: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .btn:hover { transform: scale(1.04); background: #e4e4e7; }
+        canvas { position: fixed; top: 0; left: 0; }
+        .overlay-text { position: fixed; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 2rem; font-weight: 700; pointer-events: none; z-index: 10; }
+        .progress-bar { position: fixed; top: 0; left: 0; right: 0; height: 3px; z-index: 10; background: #27272a; }
+        .progress-fill { height: 100%; background: #d4d4d8; transition: width 0.3s; }
+        .trial-info { position: fixed; top: 10px; right: 16px; color: #52525b; font-size: 0.85rem; z-index: 10; }
+        .stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin: 20px 0; max-width: 360px; }
+        .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+        .stat-label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
+        .stat-value { font-size: 1.3rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+    </style>
+</head>
+<body>
+
+<div class="screen active" id="instructions">
+    <h1>Pursuit Tracking</h1>
+    <p>A target will move across the screen. Keep your cursor as close to it as possible.</p>
+    <p>You'll do a few practice trials first, then the main task with various movement patterns.</p>
+    <button class="btn" onclick="startTask()">Start</button>
+</div>
+
+<canvas id="canvas"></canvas>
+<div class="progress-bar" style="display:none;" id="progressBar"><div class="progress-fill" id="progressFill"></div></div>
+<div class="trial-info" style="display:none;" id="trialInfo"></div>
+<div class="overlay-text" style="display:none;" id="overlayText"></div>
+
+<div class="screen" id="endScreen">
+    <h1>Task Complete</h1>
+    <div class="stats-grid" id="statsGrid"></div>
+    <button class="btn" onclick="downloadData()">Download JSON</button>
+    <button class="btn" onclick="downloadCSV()" style="margin-top:8px;">Download CSV</button>
+</div>
+
+<script>
+const params = new URLSearchParams(window.location.search);
+const participantId = params.get('pid') || 'unknown';
+
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+let W, H;
+
+function resize() { W = canvas.width = window.innerWidth; H = canvas.height = window.innerHeight; }
+resize(); window.addEventListener('resize', resize);
+
+let mouseX = W / 2, mouseY = H / 2;
+document.addEventListener('mousemove', e => { mouseX = e.clientX; mouseY = e.clientY; });
+
+// Trial definitions
+const patterns = [
+    { name: 'circular', speed: 1.0 }, { name: 'circular', speed: 1.5 },
+    { name: 'sinusoidal', speed: 1.0 }, { name: 'sinusoidal', speed: 1.5 },
+    { name: 'figure8', speed: 1.0 }, { name: 'figure8', speed: 1.5 },
+    { name: 'randomwalk', speed: 1.0 }, { name: 'randomwalk', speed: 1.5 },
+    { name: 'sudden', speed: 1.0 }, { name: 'sudden', speed: 1.3 },
+    { name: 'circular', speed: 2.0 }, { name: 'sinusoidal', speed: 2.0 },
+    { name: 'figure8', speed: 2.0 }, { name: 'randomwalk', speed: 1.5 },
+    { name: 'sudden', speed: 1.6 },
+];
+
+const practiceTrials = [
+    { name: 'circular', speed: 0.8, practice: true },
+    { name: 'sinusoidal', speed: 0.8, practice: true },
+    { name: 'figure8', speed: 0.8, practice: true },
+];
+
+const allTrials = [...practiceTrials, ...patterns.map(p => ({ ...p, practice: false }))];
+let currentTrial = 0;
+let trialData = [];
+let frameSamples = [];
+let trialActive = false;
+let trialStartTime = 0;
+let animId;
+
+// Target state
+let targetX, targetY, t;
+// Random walk state
+let rwVX, rwVY;
+// Sudden change state
+let suddenAngle, suddenTimer;
+
+function getTargetPos(pattern, speed, time) {
+    const cx = W / 2, cy = H / 2;
+    const r = Math.min(W, H) * 0.3;
+
+    switch (pattern) {
+        case 'circular':
+            return { x: cx + Math.cos(time * speed) * r, y: cy + Math.sin(time * speed) * r };
+        case 'sinusoidal':
+            return { x: cx + Math.cos(time * speed * 0.7) * r, y: cy + Math.sin(time * speed * 1.3) * r * 0.6 };
+        case 'figure8':
+            return { x: cx + Math.sin(time * speed) * r, y: cy + Math.sin(time * speed * 2) * r * 0.5 };
+        case 'randomwalk':
+            return null; // handled separately
+        case 'sudden':
+            return null; // handled separately
+    }
+}
+
+function startTask() {
+    document.getElementById('instructions').classList.remove('active');
+    document.getElementById('progressBar').style.display = '';
+    document.getElementById('trialInfo').style.display = '';
+    canvas.style.display = '';
+    startTrial();
+}
+
+function startTrial() {
+    if (currentTrial >= allTrials.length) return endTask();
+    const trial = allTrials[currentTrial];
+
+    // Show phase text
+    const ov = document.getElementById('overlayText');
+    ov.style.display = '';
+    ov.style.color = '#71717a';
+    ov.textContent = trial.practice ? `Practice: ${trial.name}` : `Get Ready`;
+    document.getElementById('trialInfo').textContent = trial.practice ? `Practice ${currentTrial + 1}/3` : `Trial ${currentTrial - 2}/${allTrials.length - 3}`;
+    document.getElementById('progressFill').style.width = `${(currentTrial / allTrials.length) * 100}%`;
+
+    // Init random walk / sudden
+    targetX = W / 2; targetY = H / 2; t = 0;
+    rwVX = (Math.random() - 0.5) * 4; rwVY = (Math.random() - 0.5) * 4;
+    suddenAngle = Math.random() * Math.PI * 2; suddenTimer = 0;
+
+    frameSamples = [];
+    trialActive = false;
+
+    setTimeout(() => {
+        ov.textContent = 'Track!';
+        ov.style.color = '#d4d4d8';
+        setTimeout(() => { ov.style.display = 'none'; }, 500);
+        trialActive = true;
+        trialStartTime = performance.now();
+        if (!animId) animate();
+    }, 1500);
+
+    // End trial after duration
+    setTimeout(() => {
+        trialActive = false;
+        saveTrial(trial);
+        currentTrial++;
+        setTimeout(startTrial, 800);
+    }, 1500 + 8000); // 1.5s prep + 8s tracking
+}
+
+function animate() {
+    ctx.fillStyle = '#111113';
+    ctx.fillRect(0, 0, W, H);
+
+    if (trialActive) {
+        const trial = allTrials[currentTrial];
+        const dt = 1 / 60;
+        t += dt;
+
+        // Update target
+        if (trial.name === 'randomwalk') {
+            rwVX += (Math.random() - 0.5) * trial.speed * 2;
+            rwVY += (Math.random() - 0.5) * trial.speed * 2;
+            rwVX *= 0.98; rwVY *= 0.98;
+            targetX += rwVX; targetY += rwVY;
+            // Bounce
+            if (targetX < 100 || targetX > W - 100) rwVX *= -1;
+            if (targetY < 100 || targetY > H - 100) rwVY *= -1;
+            targetX = Math.max(50, Math.min(W - 50, targetX));
+            targetY = Math.max(50, Math.min(H - 50, targetY));
+        } else if (trial.name === 'sudden') {
+            suddenTimer += dt;
+            const spd = trial.speed * 150;
+            targetX += Math.cos(suddenAngle) * spd * dt;
+            targetY += Math.sin(suddenAngle) * spd * dt;
+            if (suddenTimer > 0.8 + Math.random() * 0.5) {
+                suddenAngle = Math.random() * Math.PI * 2;
+                suddenTimer = 0;
+            }
+            if (targetX < 100 || targetX > W - 100) suddenAngle = Math.PI - suddenAngle;
+            if (targetY < 100 || targetY > H - 100) suddenAngle = -suddenAngle;
+            targetX = Math.max(50, Math.min(W - 50, targetX));
+            targetY = Math.max(50, Math.min(H - 50, targetY));
+        } else {
+            const pos = getTargetPos(trial.name, trial.speed, t);
+            targetX = pos.x; targetY = pos.y;
+        }
+
+        // Sample
+        const dist = Math.sqrt((mouseX - targetX) ** 2 + (mouseY - targetY) ** 2);
+        frameSamples.push({
+            t: performance.now(),
+            tx: Math.round(targetX), ty: Math.round(targetY),
+            cx: Math.round(mouseX), cy: Math.round(mouseY),
+            error: Math.round(dist * 10) / 10
+        });
+
+        // Draw target (solid circle, no glow)
+        ctx.beginPath(); ctx.arc(targetX, targetY, 12, 0, Math.PI * 2);
+        ctx.fillStyle = '#d4d4d8'; ctx.fill();
+
+        // Draw trail (last 30 frames, thin neutral line)
+        const trail = frameSamples.slice(-30);
+        for (let i = 0; i < trail.length - 1; i++) {
+            const alpha = i / trail.length * 0.3;
+            ctx.beginPath();
+            ctx.moveTo(trail[i].tx, trail[i].ty);
+            ctx.lineTo(trail[i + 1].tx, trail[i + 1].ty);
+            ctx.strokeStyle = `rgba(63,63,70,${alpha})`;
+            ctx.lineWidth = 1; ctx.stroke();
+        }
+
+        // Draw cursor crosshair (neutral, no glow)
+        ctx.strokeStyle = '#71717a';
+        ctx.lineWidth = 2;
+        ctx.beginPath(); ctx.moveTo(mouseX - 15, mouseY); ctx.lineTo(mouseX + 15, mouseY);
+        ctx.moveTo(mouseX, mouseY - 15); ctx.lineTo(mouseX, mouseY + 15);
+        ctx.stroke();
+
+        // Practice: show error
+        if (trial.practice) {
+            ctx.fillStyle = '#52525b'; ctx.font = '14px Inter, system-ui';
+            ctx.fillText(`Error: ${Math.round(dist)}px`, 20, H - 20);
+        }
+    }
+
+    animId = requestAnimationFrame(animate);
+}
+
+function saveTrial(trial) {
+    const errors = frameSamples.map(s => s.error);
+    const meanError = errors.length > 0 ? errors.reduce((a, b) => a + b) / errors.length : 0;
+    const rmsError = errors.length > 0 ? Math.sqrt(errors.reduce((a, b) => a + b * b, 0) / errors.length) : 0;
+
+    trialData.push({
+        trial: currentTrial + 1,
+        practice: trial.practice,
+        pattern: trial.name,
+        speed: trial.speed,
+        durationMs: 8000,
+        numSamples: frameSamples.length,
+        meanErrorPx: Math.round(meanError * 10) / 10,
+        rmsErrorPx: Math.round(rmsError * 10) / 10,
+        samples: frameSamples.slice(), // full frame data
+        timestamp: Date.now()
+    });
+}
+
+function endTask() {
+    cancelAnimationFrame(animId);
+    canvas.style.display = 'none';
+    document.getElementById('progressBar').style.display = 'none';
+    document.getElementById('trialInfo').style.display = 'none';
+    document.getElementById('endScreen').classList.add('active');
+
+    const main = trialData.filter(t => !t.practice);
+    const avgErr = main.reduce((s, t) => s + t.meanErrorPx, 0) / main.length;
+    const avgRMS = main.reduce((s, t) => s + t.rmsErrorPx, 0) / main.length;
+
+    document.getElementById('statsGrid').innerHTML = `
+        <div class="stat-box"><div class="stat-label">Mean Error</div><div class="stat-value">${avgErr.toFixed(1)}px</div></div>
+        <div class="stat-box"><div class="stat-label">RMS Error</div><div class="stat-value">${avgRMS.toFixed(1)}px</div></div>
+        <div class="stat-box"><div class="stat-label">Total Samples</div><div class="stat-value">${main.reduce((s, t) => s + t.numSamples, 0)}</div></div>
+        <div class="stat-box"><div class="stat-label">Trials</div><div class="stat-value">${main.length}</div></div>
+    `;
+    localStorage.setItem('completed_pursuit-tracking.html', 'true');
+}
+
+function downloadData() {
+    const data = { participantId, task: 'pursuit-tracking', completedAt: Date.now(), trials: trialData };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `tracking_${participantId}_${Date.now()}.json`; a.click();
+}
+
+function downloadCSV() {
+    const headers = ['trial','practice','pattern','speed','numSamples','meanErrorPx','rmsErrorPx'];
+    const rows = trialData.map(t => headers.map(h => t[h]));
+    const csv = [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+    a.download = `tracking_${participantId}_${Date.now()}.csv`; a.click();
+}
+</script>
+</body>
+</html>
