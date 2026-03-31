@@ -14,12 +14,12 @@
 // ─── Firebase Config ───
 // REPLACE these values with your Firebase project config
 const FIREBASE_CONFIG = {
-    apiKey: "YOUR_API_KEY",
-    authDomain: "YOUR_PROJECT.firebaseapp.com",
-    projectId: "YOUR_PROJECT_ID",
-    storageBucket: "YOUR_PROJECT.appspot.com",
-    messagingSenderId: "YOUR_SENDER_ID",
-    appId: "YOUR_APP_ID"
+    apiKey: "AIzaSyAA3bMOJf1OhkpF9trw1-SpT_PipoOxQJ4",
+    authDomain: "neurobehavioural-tasks.firebaseapp.com",
+    projectId: "neurobehavioural-tasks",
+    storageBucket: "neurobehavioural-tasks.firebasestorage.app",
+    messagingSenderId: "558002269627",
+    appId: "1:558002269627:web:66739bd60a5ae892a7689e"
 };
 
 // ─── State ───
