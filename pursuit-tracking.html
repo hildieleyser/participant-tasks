@@ -23,14 +23,30 @@
         .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .stat-label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.3rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="instructions">
     <h1>Pursuit Tracking</h1>
-    <p>A target will move across the screen. Keep your cursor as close to it as possible.</p>
-    <p>You'll do a few practice trials first, then the main task with various movement patterns.</p>
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">Follow the target with your cursor</div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">Keep your cursor as close as possible</div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">Patterns get harder each round</div>
+        </div>
+    </div>
     <button class="btn" onclick="startTask()">Start</button>
 </div>
 

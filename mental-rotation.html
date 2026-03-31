@@ -39,14 +39,23 @@
         .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
         .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.2rem; font-weight: 700; color: #e0e0f0; margin-top: 4px; }
+
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="instructions">
     <h1>Mental Rotation</h1>
-    <p>You will see two shapes side by side. One shape is rotated. Your task: are they the <strong>same shape</strong>, or is one a <strong>mirror image</strong>?</p>
-    <p>Press <strong>S</strong> for Same or <strong>M</strong> for Mirror. Respond as quickly and accurately as possible.</p>
+    <p>Decide if two shapes are identical or mirrored.</p>
+    <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text">Compare two shapes</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Press S for Same, M for Mirror</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">One shape is rotated</div></div>
+    </div>
     <button class="btn" onclick="startTask()">Start</button>
 </div>
 

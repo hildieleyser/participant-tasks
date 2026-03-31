@@ -34,17 +34,23 @@
         .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
         .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.2rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="instructions">
     <h1>Visual Search</h1>
-    <p>Find the <strong style="color:#ef4444;">red circle</strong> among other shapes. If you see it, press <strong>Y</strong> (or click Present). If it's not there, press <strong>N</strong> (or click Absent).</p>
-    <p>There are two types of searches:</p>
-    <p><strong>Feature search:</strong> Red circle among <span style="color:#3b82f6;">blue circles</span><br>
-    <strong>Conjunction search:</strong> Red circle among <span style="color:#ef4444;">red squares</span> and <span style="color:#3b82f6;">blue circles</span></p>
-    <p>Respond as <strong>quickly and accurately</strong> as possible.</p>
+    <p>Find the <strong style="color:#ef4444;">red circle</strong> among distractors.</p>
+    <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text">Look for the red circle</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Press Y if present, N if absent</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">Be fast and accurate</div></div>
+    </div>
     <button class="btn" onclick="startTask()">Start</button>
 </div>
 

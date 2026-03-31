@@ -49,15 +49,33 @@
         .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
         .stat-label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.3rem; font-weight: 700; color: #e0e0f0; margin-top: 4px; }
+
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
+
+        .end-subtitle { font-size: 0.85rem; color: #71717a; margin-bottom: 16px; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="instructions">
     <h1>Rhythm Replication</h1>
-    <p>You will hear a rhythmic pattern. After it plays, replicate the pattern by tapping the button or pressing <strong>Spacebar</strong>.</p>
-    <p>Try to match the timing as precisely as possible. Patterns will get progressively harder.</p>
-    <p>First, you'll do 3 practice rounds with feedback, then the main task begins.</p>
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">Listen to the rhythm</div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">Tap or press Space to replay it</div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">Match the timing precisely</div>
+        </div>
+    </div>
     <button class="btn" onclick="startTask()">Start</button>
 </div>
 
@@ -73,6 +91,7 @@
 
 <div class="screen" id="endScreen">
     <h1>Task Complete</h1>
+    <div class="end-subtitle">Your performance summary</div>
     <div class="stats-grid" id="statsGrid"></div>
     <button class="btn" onclick="downloadData()">Download JSON</button>
     <button class="btn" onclick="downloadCSV()" style="background:#27272a;border:1px solid #3f3f46;color:#d4d4d8;margin-top:8px;">Download CSV</button>

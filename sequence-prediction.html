@@ -55,15 +55,23 @@
         .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
         .stat-label { font-size: 0.65rem; color: #71717a; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.2rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="instructions">
     <h1>Sequence Prediction</h1>
-    <p>You will see a sequence of symbols that follows a hidden rule. Your task is to <strong>predict what comes next</strong>.</p>
-    <p>After each prediction, the correct answer is revealed. Try to discover the pattern as quickly as possible!</p>
-    <p>Rules start simple and get harder. You'll see 2 practice sequences, then the main task.</p>
+    <p>Each sequence follows a hidden rule -- find it.</p>
+    <div class="steps">
+        <div class="step"><div class="step-num">1</div><div class="step-text">Watch the pattern</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Predict what comes next</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">Discover the hidden rule</div></div>
+    </div>
     <button class="btn" onclick="startTask()">Start</button>
 </div>
 

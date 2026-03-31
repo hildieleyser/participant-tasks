@@ -85,28 +85,24 @@
     display:inline-block;background:#18181b;border:1px solid #27272a;
     border-radius:20px;padding:4px 16px;font-size:0.8rem;color:#a1a1aa;margin:4px 0;
   }
+  .steps { display: flex; gap: 32px; margin: 28px 0; }
+  .step { text-align: center; }
+  .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+  .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
 </style>
 </head>
 <body>
 
 <!-- INSTRUCTIONS SCREEN -->
 <div id="screen-instructions" class="screen active">
-  <h1>Facial Emotion Morphing Task</h1>
-  <div class="instructions-content">
-    <p>In this task, a face will slowly <strong class="neon-accent">morph</strong> from one emotion to another over about 5 seconds.</p>
-    <p>Your job is to <strong>identify the new emotion as early as possible</strong> by clicking one of the 6 emotion buttons below the face.</p>
-    <ul>
-      <li>A face starts showing one emotion and gradually changes to a different emotion.</li>
-      <li>Watch carefully and press the button for the <strong>target emotion</strong> as soon as you recognize it.</li>
-      <li>The faster and more accurately you respond, the better.</li>
-      <li>If you do not respond, the morph will complete and you must still choose an emotion.</li>
-    </ul>
-    <p>The six emotions are shown below:</p>
+  <h1>Facial Emotion Morphing</h1>
+  <p style="color:#a1a1aa;text-align:center;max-width:400px;">A face morphs between emotions -- name the new one.</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text">Watch the face change</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Identify the emotion</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Respond as early as you can</div></div>
   </div>
   <div class="example-grid" id="example-grid"></div>
-  <div class="instructions-content">
-    <p>You will start with <strong>6 practice trials</strong> (with feedback), followed by <strong>30 main trials</strong>.</p>
-  </div>
   <button class="btn btn-primary" onclick="startPractice()">Begin Practice</button>
 </div>
 

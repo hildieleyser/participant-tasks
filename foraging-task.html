@@ -66,15 +66,32 @@
         .stat-box { background: #18181b; border: 1px solid #27272a; border-radius: 10px; padding: 14px; text-align: center; }
         .stat-label { font-size: 0.7rem; color: #52525b; text-transform: uppercase; letter-spacing: 1px; }
         .stat-value { font-size: 1.3rem; font-weight: 700; color: #fafafa; margin-top: 4px; }
+
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
     </style>
 </head>
 <body>
 
 <div class="screen active" id="instructions">
     <h1>Foraging Task</h1>
-    <p>You are foraging for resources in different environments. Each environment has <strong>resource patches</strong> that yield rewards when you harvest.</p>
-    <p>Patches deplete over time — each harvest gives less than the last. You can <strong>move to a new patch</strong>, but traveling takes time.</p>
-    <p>Your goal: <strong>maximize total reward</strong> within each environment's time limit. Decide wisely when to stay and when to move!</p>
+    <p>Maximize your reward before time runs out.</p>
+    <div class="steps">
+        <div class="step">
+            <div class="step-num">1</div>
+            <div class="step-text">Harvest resources from the current patch</div>
+        </div>
+        <div class="step">
+            <div class="step-num">2</div>
+            <div class="step-text">Patches deplete over time, yielding less</div>
+        </div>
+        <div class="step">
+            <div class="step-num">3</div>
+            <div class="step-text">Move to fresh patches when rewards drop</div>
+        </div>
+    </div>
     <button class="btn" onclick="startTask()">Start Foraging</button>
 </div>
 

@@ -198,6 +198,11 @@
     75% { content: '...'; }
     100% { content: ''; }
   }
+
+  .steps { display: flex; gap: 32px; margin: 28px 0; }
+  .step { text-align: center; }
+  .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+  .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
 </style>
 </head>
 <body>
@@ -205,28 +210,11 @@
 <!-- SCREEN: Cover Story -->
 <div id="cover-screen" class="screen active">
   <h1>Online Ball-Tossing Game</h1>
-  <div class="panel">
-    <p>Welcome! In this study, you will play an online ball-tossing game called <strong>Cyberball</strong> with two other participants who are also doing this study right now.</p>
-    <br>
-    <p>The purpose of this task is to study mental visualization during a simple online game. We want you to imagine the experience as vividly as possible — picture yourself tossing and catching the ball in real time.</p>
-    <br>
-    <p>You will play <strong>three short games</strong> (about 1-2 minutes each). Between games, we will ask you a few brief questions about your experience.</p>
-  </div>
-  <button class="btn" onclick="showScreen('instructions-screen')">Continue</button>
-</div>
-
-<!-- SCREEN: Instructions -->
-<div id="instructions-screen" class="screen">
-  <h1>How to Play</h1>
-  <div class="panel">
-    <ul>
-      <li>You and two other players will toss a ball back and forth.</li>
-      <li>When you receive the ball, <strong>click on the player</strong> you want to throw it to.</li>
-      <li>When another player has the ball, just wait for them to decide.</li>
-      <li>There are no right or wrong choices — just play naturally.</li>
-    </ul>
-    <br>
-    <p style="color:#71717a; font-size:0.9rem;">The game will begin once all players are connected. Please wait a moment after clicking "Ready".</p>
+  <p style="text-align:center;max-width:460px;">Play Cyberball with two other participants -- imagine the experience vividly.</p>
+  <div class="steps">
+    <div class="step"><div class="step-num">1</div><div class="step-text">Play catch with others</div></div>
+    <div class="step"><div class="step-num">2</div><div class="step-text">Click a player to throw</div></div>
+    <div class="step"><div class="step-num">3</div><div class="step-text">Three rounds of play</div></div>
   </div>
   <button class="btn" onclick="startConnecting()">I'm Ready</button>
 </div>

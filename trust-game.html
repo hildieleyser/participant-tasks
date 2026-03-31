@@ -197,6 +197,11 @@ body{
 /* Animations */
 @keyframes fadeIn{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 .fade-in{animation:fadeIn .4s ease}
+
+.steps { display: flex; gap: 32px; margin: 28px 0; }
+.step { text-align: center; }
+.step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+.step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
 </style>
 </head>
 <body>
@@ -204,35 +209,14 @@ body{
 
   <!-- INSTRUCTIONS SCREEN -->
   <div class="screen active" id="instructions-screen">
-    <div class="instructions-box fade-in">
+    <div class="instructions-box fade-in" style="text-align:center;">
       <h1>The Trust Game</h1>
-      <p>Welcome to this behavioral research task. You will interact with several different partners in a series of investment decisions.</p>
-
-      <h2>How It Works</h2>
-      <ul>
-        <li>Each round, you start with <span class="highlight">10 tokens</span>.</li>
-        <li>You choose how many tokens (0 to 10) to <span class="highlight">send to your partner</span>.</li>
-        <li>The amount you send is <span class="highlight">tripled</span> -- your partner receives 3x what you sent.</li>
-        <li>Your partner then decides how much of their received amount to <span class="highlight">return to you</span>.</li>
-        <li>Your earnings for the round = tokens you kept + tokens returned by partner.</li>
-      </ul>
-
-      <h2>Example</h2>
-      <p>You send <span class="highlight">6 tokens</span>. You keep 4. Your partner receives 18 (6 x 3). If your partner returns 9 tokens to you, your total for the round is 4 + 9 = <span class="highlight">13 tokens</span>.</p>
-
-      <h2>Structure</h2>
-      <ul>
-        <li>First, you will do a short <span class="highlight">practice round</span> (3 rounds with 1 partner) to get comfortable.</li>
-        <li>Then you will play <span class="highlight">10 rounds</span> with each of <span class="highlight">5 different partners</span>.</li>
-        <li>Each partner has their own personality and strategy. You will not know what it is in advance.</li>
-        <li>Partners are shown as abstract avatars. Each partner is different.</li>
-      </ul>
-
-      <h2>Your Goal</h2>
-      <p>There is no single "correct" strategy. Play however feels right to you. We are interested in your natural decision-making process.</p>
-
-      <p style="margin-top:20px;color:var(--text-muted);font-size:13px;text-align:center">Your responses will be recorded for research purposes. No personally identifying information is collected.</p>
-
+      <p style="color:var(--text-dim);text-align:center;">Send tokens to partners and see what they return.</p>
+      <div class="steps" style="justify-content:center;">
+        <div class="step"><div class="step-num">1</div><div class="step-text">Send tokens to a partner</div></div>
+        <div class="step"><div class="step-num">2</div><div class="step-text">Sent amount is tripled</div></div>
+        <div class="step"><div class="step-num">3</div><div class="step-text">Partner returns some back</div></div>
+      </div>
       <div style="text-align:center">
         <button class="btn" onclick="startPractice()">Begin Practice</button>
       </div>

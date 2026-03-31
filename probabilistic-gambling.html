@@ -30,6 +30,11 @@
             margin-bottom: 20px;
         }
         .instructions p { color: #71717a; line-height: 1.7; margin-bottom: 16px; font-size: 1rem; }
+        .steps { display: flex; gap: 32px; margin: 28px 0; }
+        .step { text-align: center; }
+        .step-num { width: 36px; height: 36px; border-radius: 50%; background: #27272a; color: #fafafa; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.9rem; margin: 0 auto 10px; }
+        .step-text { font-size: 0.85rem; color: #a1a1aa; max-width: 140px; }
+        .badge { display: inline-block; background: #27272a; color: #a1a1aa; font-size: 0.8rem; font-weight: 600; padding: 5px 14px; border-radius: 20px; margin-bottom: 20px; }
         .btn {
             background: #fafafa;
             color: #111113;
@@ -139,10 +144,12 @@
 <div class="screen active" id="instructionsScreen">
     <div class="instructions">
         <h1>Probabilistic Gambling Task</h1>
-        <p>You have been given a loan of <strong>$2,000</strong>.</p>
-        <p>In front of you are four decks of cards: <strong>A</strong>, <strong>B</strong>, <strong>C</strong>, and <strong>D</strong>. Each time you click a deck, you will receive some money. But sometimes you will also lose money.</p>
-        <p>Some decks are more profitable than others in the long run. Your goal is to <strong>maximize your total earnings</strong> over 100 card selections.</p>
-        <p>You won't know which decks are good or bad — you'll have to figure it out as you go.</p>
+        <span class="badge">Starting bank: $2,000</span>
+        <div class="steps">
+            <div class="step"><div class="step-num">1</div><div class="step-text">Pick a deck</div></div>
+            <div class="step"><div class="step-num">2</div><div class="step-text">Win or lose money</div></div>
+            <div class="step"><div class="step-num">3</div><div class="step-text">Find the best decks</div></div>
+        </div>
         <button class="btn" onclick="startGame()">Begin Task</button>
     </div>
 </div>
