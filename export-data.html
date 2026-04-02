@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Export Response Data</title>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Inter', system-ui, sans-serif; background: #111113; color: #d4d4d8; min-height: 100vh; padding: 48px 24px; -webkit-font-smoothing: antialiased; }
+        .container { max-width: 700px; margin: 0 auto; }
+        h1 { font-size: 1.5rem; color: #fafafa; margin-bottom: 6px; }
+        .subtitle { font-size: 0.85rem; color: #71717a; margin-bottom: 32px; }
+        .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 32px; }
+        .stat { background: #18181b; border: 1px solid #27272a; border-radius: 8px; padding: 16px; text-align: center; }
+        .stat-value { font-size: 1.8rem; font-weight: 700; color: #fafafa; }
+        .stat-label { font-size: 0.7rem; color: #71717a; text-transform: uppercase; letter-spacing: 0.05em; margin-top: 4px; }
+        .section { margin-bottom: 24px; }
+        .section-title { font-size: 0.8rem; color: #52525b; text-transform: uppercase; letter-spacing: 0.05em; font-weight: 600; margin-bottom: 10px; }
+        .btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+        .btn { padding: 10px 20px; border-radius: 8px; font-family: inherit; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: background 0.15s; border: none; }
+        .btn-primary { background: #fafafa; color: #111113; }
+        .btn-primary:hover { background: #e4e4e7; }
+        .btn-secondary { background: #27272a; color: #d4d4d8; border: 1px solid #3f3f46; }
+        .btn-secondary:hover { background: #3f3f46; }
+        .btn:disabled { opacity: 0.3; cursor: not-allowed; }
+        .task-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+        .task-table th, .task-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #27272a; font-size: 0.82rem; }
+        .task-table th { color: #71717a; font-weight: 600; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; }
+        .task-table td { color: #a1a1aa; }
+        .status { padding: 12px 16px; border-radius: 8px; font-size: 0.85rem; margin-bottom: 16px; display: none; }
+        .status.loading { display: block; background: #18181b; border: 1px solid #27272a; color: #a1a1aa; }
+        .status.success { display: block; background: #1a2e1a; border: 1px solid #27572a; color: #4ade80; }
+        .status.error { display: block; background: #2e1a1a; border: 1px solid #572a2a; color: #ef4444; }
+        .filter-row { display: flex; gap: 8px; margin-bottom: 16px; align-items: center; }
+        .filter-row select, .filter-row input { background: #18181b; border: 1px solid #27272a; border-radius: 6px; padding: 7px 12px; color: #d4d4d8; font-family: inherit; font-size: 0.8rem; }
+        .filter-row label { font-size: 0.8rem; color: #71717a; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Export Response Data</h1>
+        <p class="subtitle">Pull all participant data from Firestore for analysis.</p>
+
+        <div class="status" id="status"></div>
+
+        <div class="stats" id="stats">
+            <div class="stat"><div class="stat-value" id="totalResponses">-</div><div class="stat-label">Responses</div></div>
+            <div class="stat"><div class="stat-value" id="totalParticipants">-</div><div class="stat-label">Participants</div></div>
+            <div class="stat"><div class="stat-value" id="totalTasks">-</div><div class="stat-label">Tasks</div></div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Filter</div>
+            <div class="filter-row">
+                <label>Task:</label>
+                <select id="filterTask"><option value="">All tasks</option></select>
+                <label>Participant:</label>
+                <select id="filterParticipant"><option value="">All participants</option></select>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Export</div>
+            <div class="btn-row">
+                <button class="btn btn-primary" onclick="exportJSON()" id="btnJSON" disabled>Export JSON</button>
+                <button class="btn btn-primary" onclick="exportCSVFlat()" id="btnCSV" disabled>Export CSV (flat trials)</button>
+                <button class="btn btn-secondary" onclick="exportCSVSummary()" id="btnSummary" disabled>Export CSV (session summary)</button>
+                <button class="btn btn-secondary" onclick="fetchData()" id="btnRefresh">Refresh</button>
+            </div>
+        </div>
+
+        <div class="section">
+            <div class="section-title">Responses by Task</div>
+            <table class="task-table" id="taskTable">
+                <thead><tr><th>Task</th><th>Responses</th><th>Participants</th><th>Last Response</th></tr></thead>
+                <tbody id="taskTableBody"></tbody>
+            </table>
+        </div>
+    </div>
+
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+    apiKey: "AIzaSyAA3bMOJf1OhkpF9trw1-SpT_PipoOxQJ4",
+    authDomain: "neurobehavioural-tasks.firebaseapp.com",
+    projectId: "neurobehavioural-tasks",
+    storageBucket: "neurobehavioural-tasks.firebasestorage.app",
+    messagingSenderId: "558002269627",
+    appId: "1:558002269627:web:66739bd60a5ae892a7689e"
+});
+
+const db = firebase.firestore();
+let allDocs = [];
+
+async function fetchData() {
+    const status = document.getElementById('status');
+    status.className = 'status loading';
+    status.textContent = 'Fetching data from Firestore...';
+
+    try {
+        const snapshot = await db.collection('responses').get();
+        allDocs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+
+        const tasks = new Set(allDocs.map(d => d.task));
+        const participants = new Set(allDocs.map(d => d.participantId));
+
+        document.getElementById('totalResponses').textContent = allDocs.length;
+        document.getElementById('totalParticipants').textContent = participants.size;
+        document.getElementById('totalTasks').textContent = tasks.size;
+
+        // Populate filters
+        const taskSelect = document.getElementById('filterTask');
+        taskSelect.innerHTML = '<option value="">All tasks</option>';
+        [...tasks].sort().forEach(t => {
+            taskSelect.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+
+        const partSelect = document.getElementById('filterParticipant');
+        partSelect.innerHTML = '<option value="">All participants</option>';
+        [...participants].sort().forEach(p => {
+            partSelect.innerHTML += `<option value="${p}">${p}</option>`;
+        });
+
+        // Build table
+        const byTask = {};
+        allDocs.forEach(d => {
+            if (!byTask[d.task]) byTask[d.task] = { count: 0, participants: new Set(), lastDate: '' };
+            byTask[d.task].count++;
+            byTask[d.task].participants.add(d.participantId);
+            if (d.completedAt > byTask[d.task].lastDate) byTask[d.task].lastDate = d.completedAt;
+        });
+
+        const tbody = document.getElementById('taskTableBody');
+        tbody.innerHTML = '';
+        Object.entries(byTask).sort((a, b) => a[0].localeCompare(b[0])).forEach(([task, info]) => {
+            const date = info.lastDate ? new Date(info.lastDate).toLocaleDateString() : '-';
+            tbody.innerHTML += `<tr><td style="color:#fafafa;">${task}</td><td>${info.count}</td><td>${info.participants.size}</td><td>${date}</td></tr>`;
+        });
+
+        document.getElementById('btnJSON').disabled = false;
+        document.getElementById('btnCSV').disabled = false;
+        document.getElementById('btnSummary').disabled = false;
+
+        status.className = 'status success';
+        status.textContent = `Loaded ${allDocs.length} responses from ${participants.size} participants.`;
+    } catch (err) {
+        status.className = 'status error';
+        status.textContent = `Error: ${err.message}`;
+    }
+}
+
+function getFiltered() {
+    let docs = allDocs;
+    const task = document.getElementById('filterTask').value;
+    const part = document.getElementById('filterParticipant').value;
+    if (task) docs = docs.filter(d => d.task === task);
+    if (part) docs = docs.filter(d => d.participantId === part);
+    return docs;
+}
+
+function exportJSON() {
+    const docs = getFiltered();
+    const blob = new Blob([JSON.stringify(docs, null, 2)], { type: 'application/json' });
+    download(blob, `responses_${Date.now()}.json`);
+}
+
+function exportCSVFlat() {
+    const docs = getFiltered();
+    const rows = [];
+    const header = ['session_id', 'participant_id', 'task', 'completed_at', 'screen_width', 'screen_height',
+        'trial_num', 'trial_practice', 'trial_correct', 'trial_rt_ms', 'trial_data_json'];
+    rows.push(header.join(','));
+
+    docs.forEach(doc => {
+        const trials = doc.trials || [];
+        const trialArray = Array.isArray(trials) ? trials : [];
+        if (trialArray.length === 0) {
+            rows.push([
+                doc.sessionId, doc.participantId, doc.task, doc.completedAt,
+                doc.screenWidth, doc.screenHeight, '', '', '', '', ''
+            ].map(csvEscape).join(','));
+            return;
+        }
+        trialArray.forEach((trial, i) => {
+            rows.push([
+                doc.sessionId, doc.participantId, doc.task, doc.completedAt,
+                doc.screenWidth, doc.screenHeight,
+                trial.trial || trial.trialInBlock || (i + 1),
+                trial.practice ?? '',
+                trial.correct ?? trial.accuracy ?? '',
+                trial.reactionTimeMs ?? trial.reactionTime ?? trial.rt ?? '',
+                JSON.stringify(trial)
+            ].map(csvEscape).join(','));
+        });
+    });
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    download(blob, `responses_trials_${Date.now()}.csv`);
+}
+
+function exportCSVSummary() {
+    const docs = getFiltered();
+    const header = ['session_id', 'participant_id', 'task', 'completed_at', 'trial_count',
+        'screen_width', 'screen_height', 'user_agent'];
+    const rows = [header.join(',')];
+
+    docs.forEach(doc => {
+        rows.push([
+            doc.sessionId, doc.participantId, doc.task, doc.completedAt,
+            doc.trialCount || (doc.trials ? doc.trials.length : 0),
+            doc.screenWidth, doc.screenHeight, doc.userAgent
+        ].map(csvEscape).join(','));
+    });
+
+    const blob = new Blob([rows.join('\n')], { type: 'text/csv' });
+    download(blob, `responses_summary_${Date.now()}.csv`);
+}
+
+function csvEscape(val) {
+    if (val === null || val === undefined) return '';
+    const s = String(val);
+    if (s.includes(',') || s.includes('"') || s.includes('\n')) {
+        return '"' + s.replace(/"/g, '""') + '"';
+    }
+    return s;
+}
+
+function download(blob, name) {
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = name;
+    a.click();
+}
+
+// Auto-fetch on load
+fetchData();
+</script>
+</body>
+</html>
